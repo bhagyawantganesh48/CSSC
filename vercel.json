@@ -1,14 +1,18 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "quiz_backend/server.js",
-      "use": "@vercel/node"
-    }
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "/api/index" },
+    { "source": "/",           "destination": "/frontend/index.html" },
+    { "source": "/:path*",     "destination": "/frontend/:path*" }
   ],
-  "routes": [
-    { "src": "/api/(.*)",  "dest": "/quiz_backend/server.js" },
-    { "src": "/",          "dest": "/frontend/index.html"    },
-    { "src": "/(.*)",      "dest": "/frontend/$1"            }
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin",  "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET,POST,PUT,DELETE,OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type,Authorization" }
+      ]
+    }
   ]
 }

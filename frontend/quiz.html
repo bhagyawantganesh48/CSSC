@@ -777,48 +777,59 @@
                 if (isRegisterMode) {
                     const name = document.getElementById('student-name').value.trim();
                     const department = document.getElementById('student-dept').value;
-                    
-                    const res = await fetch('/api/quiz/register', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ name, email, password, department })
-                    });
-                    
-                    const text = await res.text();
-                    let data;
-                    try {
-                        data = JSON.parse(text);
-                    } catch (e) {
-                        console.error('Non-JSON Response:', text);
-                        throw new Error('Server returned invalid data format.');
+
+                    // ── Firebase Auth: Create account ──
+                    const fbAuth = window.__csscAuth;
+                    const fbCreateUser = window.__createUserWithEmailAndPassword;
+                    const fbUpdateProfile = window.__updateProfile;
+                    const db = window.__csscDb;
+                    const fbSetDoc = window.__setDoc;
+                    const fbDoc = window.__doc;
+
+                    if (!fbAuth) throw new Error('Auth service not ready. Please refresh.');
+
+                    const cred = await fbCreateUser(fbAuth, email, password);
+                    await fbUpdateProfile(cred.user, { displayName: name });
+
+                    // Store department in Firestore users collection
+                    if (db && fbSetDoc && fbDoc) {
+                        await fbSetDoc(fbDoc(db, 'users', cred.user.uid), {
+                            name, email, department,
+                            registeredAt: new Date().toISOString()
+                        });
                     }
 
-                    if (data.success) {
-                        // Switch to Login Mode for manual verification
-                        isRegisterMode = false;
-                        regFields.style.display = 'none';
-                        authTitle.textContent = 'Student Login';
-                        authBtn.textContent = '⚡ VERIFY IDENTITY';
-                        toggleBtn.textContent = 'NEW STUDENT? REGISTER HERE';
-                        
-                        // Clear password and reset requirements
-                        document.getElementById('student-password').value = '';
-                        document.getElementById('student-name').required = false;
-                        document.getElementById('student-dept').required = false;
+                    // Switch to Login Mode
+                    isRegisterMode = false;
+                    regFields.style.display = 'none';
+                    authTitle.textContent = 'Student Login';
+                    authBtn.textContent = '⚡ VERIFY IDENTITY';
+                    toggleBtn.textContent = 'NEW STUDENT? REGISTER HERE';
+                    document.getElementById('student-password').value = '';
+                    document.getElementById('student-name').required = false;
+                    document.getElementById('student-dept').required = false;
 
-                        authMsg.style.color = '#00ffaa';
-                        authMsg.textContent = 'Registration Successful! Please login to continue.';
-                        authMsg.style.display = 'block';
-                        authBtn.disabled = false;
-                    } else {
-                        throw new Error(data.message || 'Registration failed');
-                    }
+                    authMsg.style.color = '#00ffaa';
+                    authMsg.textContent = 'Registration Successful! Please login to continue.';
+                    authMsg.style.display = 'block';
+                    authBtn.disabled = false;
                 } else {
                     await performLogin(email, password);
                 }
             } catch (err) {
+                // Translate Firebase error codes to friendly messages
+                const fbErrors = {
+                    'auth/email-already-in-use': 'This email is already registered. Please login.',
+                    'auth/invalid-email': 'Please enter a valid email address.',
+                    'auth/weak-password': 'Password must be at least 6 characters.',
+                    'auth/user-not-found': 'No account found with this email.',
+                    'auth/wrong-password': 'Incorrect password. Try again.',
+                    'auth/invalid-credential': 'Invalid email or password.',
+                    'auth/too-many-requests': 'Too many attempts. Please wait a moment.'
+                };
+                const msg = fbErrors[err.code] || err.message || 'Authentication failed.';
                 authMsg.style.color = '#ff4757';
-                authMsg.textContent = err.message || 'Connection failed.';
+                authMsg.textContent = msg;
                 authMsg.style.display = 'block';
                 authBtn.disabled = false;
                 authBtn.textContent = isRegisterMode ? '🚀 CREATE ACCOUNT' : '⚡ VERIFY IDENTITY';
@@ -826,25 +837,36 @@
         });
 
         async function performLogin(email, password) {
+            const fbAuth = window.__csscAuth;
+            const fbSignIn = window.__signInWithEmailAndPassword;
+            const db = window.__csscDb;
+            const fbGetDoc = window.__getDoc;
+            const fbDoc = window.__doc;
+
+            if (!fbAuth) throw new Error('Auth service not ready. Please refresh.');
+
+            const cred = await fbSignIn(fbAuth, email, password);
+            const user = cred.user;
+
+            // Try to get department from Firestore
+            let department = 'General';
             try {
-                const res = await fetch('/api/quiz/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password })
-                });
-                const data = await res.json();
-                
-                if (data.success) {
-                    sessionStorage.setItem(LOGIN_KEY, data.user.id);
-                    // Store full user object so finishQuiz() can read name/email/dept
-                    sessionStorage.setItem('cssc_student_user', JSON.stringify(data.user));
-                    overlay.style.display = 'none';
-                } else {
-                    throw new Error(data.message || 'Invalid credentials.');
+                if (db && fbGetDoc && fbDoc) {
+                    const snap = await fbGetDoc(fbDoc(db, 'users', user.uid));
+                    if (snap.exists()) department = snap.data().department || 'General';
                 }
-            } catch (err) {
-                throw err;
-            }
+            } catch (e) { /* non-fatal */ }
+
+            const userObj = {
+                id:         user.uid,
+                name:       user.displayName || email.split('@')[0],
+                email:      user.email,
+                department: department
+            };
+
+            sessionStorage.setItem(LOGIN_KEY, user.uid);
+            sessionStorage.setItem('cssc_student_user', JSON.stringify(userObj));
+            overlay.style.display = 'none';
         }
 
         // ─── ROUND QUESTION BANK ─────────────────────────────────
@@ -1391,11 +1413,13 @@
     })();
     </script>
 
-    <!-- ===== FIREBASE SDK (ES Module) ===== -->
+    <!-- ===== FIREBASE SDK (ES Module) — Auth + Firestore ===== -->
     <script type="module">
         import { initializeApp }    from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-        import { getFirestore, collection, addDoc, serverTimestamp }
+        import { getFirestore, collection, addDoc, serverTimestamp, doc, setDoc, getDoc }
                                     from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile }
+                                    from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 
         const firebaseConfig = {
             apiKey:            'AIzaSyBDzUCgdQ2go81-Z7t-Ky7_wNBQryAUC7Q',
@@ -1407,16 +1431,24 @@
             measurementId:     'G-Z8WV82HQ2N'
         };
 
-        const app = initializeApp(firebaseConfig);
-        const db  = getFirestore(app);
+        const app  = initializeApp(firebaseConfig);
+        const db   = getFirestore(app);
+        const auth = getAuth(app);
 
         // Expose to non-module IIFE script
-        window.__csscDb          = db;
-        window.__addDoc          = addDoc;
-        window.__collection      = collection;
-        window.__serverTimestamp = serverTimestamp;
+        window.__csscDb                        = db;
+        window.__csscAuth                      = auth;
+        window.__addDoc                        = addDoc;
+        window.__collection                    = collection;
+        window.__serverTimestamp               = serverTimestamp;
+        window.__doc                           = doc;
+        window.__setDoc                        = setDoc;
+        window.__getDoc                        = getDoc;
+        window.__createUserWithEmailAndPassword = createUserWithEmailAndPassword;
+        window.__signInWithEmailAndPassword    = signInWithEmailAndPassword;
+        window.__updateProfile                 = updateProfile;
 
-        console.log('🔥 Firebase connected to project: cssc-quizes-system');
+        console.log('🔥 Firebase Auth + Firestore ready');
     </script>
 </body>
 </html>

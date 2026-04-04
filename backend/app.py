@@ -132,7 +132,7 @@ def migrate_csv_to_db():
                     db.session.add(m)
                 db.session.commit()
             print(f"Migration complete. Archiving members.csv...")
-            os.rename(csv_path, csv_path + ".bak")
+            os.replace(csv_path, csv_path + ".bak")
         except Exception as e:
             print(f"Migration error: {e}")
             db.session.rollback()

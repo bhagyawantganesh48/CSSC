@@ -361,7 +361,6 @@ function toggleEmail(btn) {
         const val = this.value.trim();
         const phoneRe = /^[+]?[0-9\s\-]{10,15}$/;
         if (!val) setFieldError('phone', 'phone-msg', 'Phone number is required.');
-        else if (!phoneRe.test(val)) setFieldError('phone', 'phone-msg', 'Enter a valid 10-15 digit phone number.');
         else clearFieldError('phone', 'phone-msg');
     });
 
@@ -524,14 +523,14 @@ document.querySelectorAll('.footer-year').forEach(el => {
 
 
 /* ============================================================
-   12. LAUNCH COUNTDOWN TIMER (March 10, 2026)
+   12. LAUNCH COUNTDOWN TIMER (March 25, 2026)
    ============================================================ */
 (function initCountdown() {
     const wrap = document.getElementById('countdown-wrap');
     if (!wrap) return;
 
-    // Launch date: March 10, 2026 at 00:00:00 IST (UTC+5:30)
-    const LAUNCH = new Date('2026-03-10T00:00:00+05:30').getTime();
+    // Launch date: March 25, 2026 at 00:00:00 IST (UTC+5:30)
+    const LAUNCH = new Date('2026-03-25T00:00:00+05:30').getTime();
 
     const elDays = document.getElementById('cd-days');
     const elHours = document.getElementById('cd-hours');
@@ -560,7 +559,7 @@ document.querySelectorAll('.footer-year').forEach(el => {
             wrap.classList.add('launched');
             wrap.innerHTML = `
                 <div class="launched-msg">🎉 CSSC IS OFFICIALLY LAUNCHED! 🎉</div>
-                <div class="countdown-date">📅 Established March 10, 2026</div>
+                <div class="countdown-date">📅 Established March 25, 2026</div>
             `;
             return; // stop ticking
         }

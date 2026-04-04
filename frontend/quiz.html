@@ -1,0 +1,1422 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="CSSC Online Quiz – Test your Cybersecurity knowledge with our AI-proctored quiz engine." />
+    <title>CSSC Quiz Arena – Cyber Security Student Club</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="icon" href="assets/logo.png" type="image/png" />
+    <style>
+        /* ===========================
+           QUIZ PAGE SPECIFIC STYLES
+           =========================== */
+        .quiz-hero {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 120px 20px 60px;
+        }
+
+        /* === LOBBY === */
+        .quiz-lobby {
+            max-width: 900px;
+            width: 100%;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 32px;
+            align-items: start;
+        }
+        @media (max-width: 760px) { .quiz-lobby { grid-template-columns: 1fr; } }
+
+        .lobby-left { display: flex; flex-direction: column; gap: 20px; }
+        .lobby-tag {
+            display: inline-block;
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            letter-spacing: 3px;
+            color: var(--neon-green);
+            border: 1px solid rgba(0,255,136,0.3);
+            padding: 6px 16px;
+            border-radius: 30px;
+            background: rgba(0,255,136,0.05);
+            width: fit-content;
+        }
+        .lobby-title { font-size: clamp(2rem, 4vw, 3.2rem); font-weight: 900; line-height: 1.1; margin: 0; }
+        .lobby-title span { color: var(--neon-green); }
+        .lobby-desc { color: var(--text-secondary); line-height: 1.7; font-size: 0.95rem; }
+        .lobby-badges { display: flex; gap: 10px; flex-wrap: wrap; }
+        .lobby-badge {
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            letter-spacing: 2px;
+            padding: 6px 14px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: rgba(255,255,255,0.03);
+            color: var(--text-secondary);
+            text-transform: uppercase;
+        }
+        .lobby-badge.blue { border-color: rgba(0,212,255,0.4); color: var(--neon-blue); }
+        .lobby-badge.green { border-color: rgba(0,255,136,0.4); color: var(--neon-green); }
+
+        .lobby-right {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 32px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .lobby-sec-title {
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            letter-spacing: 3px;
+            color: var(--neon-green);
+            margin-bottom: 4px;
+        }
+        .quiz-rule {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.88rem;
+            color: var(--text-secondary);
+        }
+        .quiz-rule:last-of-type { border-bottom: none; padding-bottom: 0; }
+        .quiz-rule-dot {
+            width: 6px; height: 6px; border-radius: 50%;
+            background: var(--neon-green); margin-top: 6px; flex-shrink: 0;
+        }
+
+        .quiz-select-wrap { display: flex; flex-direction: column; gap: 8px; }
+        .quiz-select-wrap label { font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 2px; color: var(--neon-blue); text-transform: uppercase; }
+        .quiz-select {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text-primary);
+            padding: 12px 16px;
+            font-size: 0.9rem;
+            outline: none;
+            transition: border .2s;
+            cursor: pointer;
+        }
+        .quiz-select:focus { border-color: var(--neon-blue); }
+
+        .start-btn {
+            width: 100%;
+            padding: 16px;
+            border-radius: 12px;
+            border: none;
+            background: var(--neon-green);
+            color: #0a0a0f;
+            font-weight: 900;
+            font-size: 1rem;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: transform .2s, box-shadow .2s;
+            box-shadow: 0 0 20px rgba(0,255,136,0.3);
+        }
+        .start-btn:hover { transform: translateY(-2px); box-shadow: 0 0 30px rgba(0,255,136,0.5); }
+        .start-btn:active { transform: scale(0.98); }
+
+        /* === QUIZ ENGINE === */
+        #quiz-engine { display: none; min-height: 100vh; padding: 120px 20px 60px; }
+        .engine-wrap { max-width: 820px; margin: 0 auto; }
+
+        .engine-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 32px; flex-wrap: wrap; gap: 12px;
+        }
+        .engine-meta { display: flex; flex-direction: column; gap: 4px; }
+        .engine-tag { font-family: var(--font-mono); font-size: 0.65rem; letter-spacing: 3px; color: var(--neon-green); text-transform: uppercase; }
+        .engine-title { font-size: 1.5rem; font-weight: 800; }
+        .engine-timer {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 14px 24px;
+            display: flex; align-items: center; gap: 10px;
+            font-family: var(--font-mono);
+        }
+        .timer-icon { font-size: 1.2rem; }
+        .timer-val { font-size: 1.4rem; font-weight: 900; color: var(--neon-green); letter-spacing: 2px; }
+        .timer-val.warning { color: #ff6b6b; animation: pulse 1s infinite; }
+
+        .progress-wrap { margin-bottom: 28px; }
+        .progress-meta { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-muted); margin-bottom: 6px; }
+        .progress-bar { height: 4px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, var(--neon-green), var(--neon-blue)); border-radius: 4px; transition: width 0.4s ease; }
+
+        .question-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 40px;
+            margin-bottom: 24px;
+            position: relative;
+            overflow: hidden;
+        }
+        .question-card::before {
+            content: '';
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 2px;
+            background: linear-gradient(90deg, transparent, var(--neon-green), transparent);
+        }
+        .question-num { font-family: var(--font-mono); font-size: 0.65rem; letter-spacing: 3px; color: var(--neon-green); margin-bottom: 14px; text-transform: uppercase; }
+        .question-text { font-size: 1.2rem; font-weight: 600; line-height: 1.6; color: var(--text-primary); }
+
+        .options-grid { display: flex; flex-direction: column; gap: 12px; margin-bottom: 28px; }
+        .option-btn {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px 20px;
+            text-align: left;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex; align-items: center; gap: 16px;
+            font-size: 0.95rem;
+        }
+        .option-btn:hover { border-color: rgba(0,212,255,0.5); color: var(--text-primary); background: rgba(0,212,255,0.05); }
+        .option-btn.selected { border-color: var(--neon-green); color: var(--neon-green); background: rgba(0,255,136,0.08); box-shadow: 0 0 0 1px rgba(0,255,136,0.2); }
+        .option-btn.correct { border-color: var(--neon-green); background: rgba(0,255,136,0.15); color: var(--neon-green); }
+        .option-btn.wrong { border-color: #ff4757; background: rgba(255,71,87,0.1); color: #ff4757; }
+        .option-btn:disabled { cursor: not-allowed; }
+        .option-letter {
+            width: 32px; height: 32px; min-width: 32px;
+            border: 1px solid currentColor;
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-family: var(--font-mono);
+            font-size: 0.75rem; font-weight: 700;
+        }
+
+        .engine-footer {
+            display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;
+        }
+        .violation-badge {
+            background: rgba(255,71,87,0.1);
+            border: 1px solid rgba(255,71,87,0.3);
+            border-radius: 8px;
+            padding: 8px 16px;
+            color: #ff4757;
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            letter-spacing: 2px;
+        }
+        .next-btn {
+            padding: 14px 32px;
+            border-radius: 12px;
+            border: none;
+            font-weight: 700;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            letter-spacing: 1px;
+        }
+        .next-btn:disabled {
+            background: rgba(255,255,255,0.05);
+            color: var(--text-muted);
+            cursor: not-allowed;
+        }
+        .next-btn.active {
+            background: var(--neon-green);
+            color: #0a0a0f;
+            box-shadow: 0 0 20px rgba(0,255,136,0.3);
+        }
+        .next-btn.active:hover { transform: translateY(-2px); }
+
+        /* === VIOLATION OVERLAY === */
+        #violation-overlay {
+            display: none;
+            position: fixed; inset: 0; z-index: 9999;
+            background: rgba(10,10,15,0.95);
+            backdrop-filter: blur(10px);
+            align-items: center; justify-content: center;
+        }
+        #violation-overlay.show { display: flex; }
+        .violation-card {
+            background: var(--bg-card);
+            border: 1px solid rgba(255,71,87,0.4);
+            border-radius: 24px;
+            padding: 48px;
+            max-width: 440px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 0 60px rgba(255,71,87,0.2);
+        }
+        .violation-icon { font-size: 3.5rem; margin-bottom: 16px; }
+        .violation-title { font-size: 1.6rem; font-weight: 900; color: #ff4757; margin-bottom: 8px; }
+        .violation-sub { font-family: var(--font-mono); font-size: 0.65rem; letter-spacing: 3px; color: rgba(255,71,87,0.6); margin-bottom: 24px; }
+        .violation-info { font-size: 0.88rem; color: var(--text-secondary); line-height: 1.6; margin-bottom: 32px; background: rgba(255,71,87,0.05); border: 1px solid rgba(255,71,87,0.15); border-radius: 12px; padding: 16px; }
+        .violation-count { font-family: var(--font-mono); font-size: 0.65rem; color: rgba(255,71,87,0.5); margin-top: 12px; letter-spacing: 2px; }
+        .violation-dismiss {
+            width: 100%;
+            padding: 14px;
+            border-radius: 12px;
+            border: none;
+            background: #ff4757;
+            color: white;
+            font-weight: 900;
+            font-size: 0.9rem;
+            cursor: pointer;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            transition: all 0.2s;
+        }
+        .violation-dismiss:hover { background: #ff6b6b; transform: scale(1.02); }
+
+        /* === RESULTS === */
+        #quiz-results { display: none; min-height: 100vh; padding: 120px 20px 60px; }
+        .results-wrap { max-width: 700px; margin: 0 auto; text-align: center; }
+        .result-badge-wrap { margin-bottom: 32px; }
+        .result-icon { font-size: 4rem; margin-bottom: 12px; }
+        .result-title { font-size: 2.5rem; font-weight: 900; margin-bottom: 8px; }
+        .result-score {
+            font-family: var(--font-mono);
+            font-size: 4.5rem;
+            font-weight: 900;
+            line-height: 1;
+            margin: 24px 0;
+        }
+        .result-score.excellent { color: var(--neon-green); text-shadow: 0 0 40px rgba(0,255,136,0.5); }
+        .result-score.good { color: var(--neon-blue); text-shadow: 0 0 40px rgba(0,212,255,0.5); }
+        .result-score.fail { color: #ff4757; text-shadow: 0 0 40px rgba(255,71,87,0.5); }
+
+        .result-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin: 32px 0;
+        }
+        .result-stat {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 20px;
+        }
+        .result-stat-val { font-family: var(--font-mono); font-size: 1.8rem; font-weight: 900; }
+        .result-stat-label { font-size: 0.7rem; letter-spacing: 2px; text-transform: uppercase; color: var(--text-muted); margin-top: 4px; }
+        .result-actions { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin-top: 32px; }
+
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+        /* === COOLDOWN LOCKOUT SCREEN === */
+        #cooldown-screen {
+            display: none;
+            min-height: 100vh;
+            align-items: center;
+            justify-content: center;
+            padding: 120px 20px 60px;
+        }
+        #cooldown-screen.show { display: flex; }
+        .cooldown-wrap {
+            max-width: 560px;
+            width: 100%;
+            text-align: center;
+        }
+        .cooldown-icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            display: block;
+        }
+        .cooldown-title {
+            font-size: 2.2rem;
+            font-weight: 900;
+            color: #ff4757;
+            margin-bottom: 8px;
+            letter-spacing: -1px;
+        }
+        .cooldown-subtitle {
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            letter-spacing: 3px;
+            color: rgba(255,71,87,0.5);
+            margin-bottom: 32px;
+            text-transform: uppercase;
+        }
+        .cooldown-timer-box {
+            background: var(--bg-card);
+            border: 1px solid rgba(255,71,87,0.3);
+            border-radius: 20px;
+            padding: 40px;
+            margin-bottom: 32px;
+            box-shadow: 0 0 40px rgba(255,71,87,0.1);
+            position: relative;
+            overflow: hidden;
+        }
+        .cooldown-timer-box::before {
+            content: '';
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 2px;
+            background: linear-gradient(90deg, transparent, #ff4757, transparent);
+        }
+        .cooldown-label {
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            letter-spacing: 3px;
+            color: rgba(255,71,87,0.6);
+            text-transform: uppercase;
+            margin-bottom: 20px;
+        }
+        .cooldown-digits {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+        .cooldown-digit {
+            font-family: var(--font-mono);
+            font-size: 3.5rem;
+            font-weight: 900;
+            color: #ff4757;
+            background: rgba(255,71,87,0.07);
+            border: 1px solid rgba(255,71,87,0.2);
+            border-radius: 12px;
+            padding: 12px 20px;
+            min-width: 80px;
+            letter-spacing: 2px;
+            text-shadow: 0 0 20px rgba(255,71,87,0.4);
+        }
+        .cooldown-colon {
+            font-family: var(--font-mono);
+            font-size: 3rem;
+            font-weight: 900;
+            color: rgba(255,71,87,0.4);
+            animation: pulse 1s infinite;
+        }
+        .cooldown-progress-bar { height: 6px; background: rgba(255,255,255,0.06); border-radius: 6px; overflow: hidden; margin-top: 8px; }
+        .cooldown-progress-fill { height: 100%; background: linear-gradient(90deg, #ff4757, rgba(255,71,87,0.3)); border-radius: 6px; transition: width 1s linear; }
+        .cooldown-module-tag {
+            display: inline-block;
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            letter-spacing: 2px;
+            color: var(--text-muted);
+            border: 1px solid var(--border);
+            padding: 6px 16px;
+            border-radius: 20px;
+            background: rgba(255,255,255,0.02);
+            margin-bottom: 24px;
+        }
+        .cooldown-info {
+            color: var(--text-secondary);
+            font-size: 0.88rem;
+            line-height: 1.7;
+            background: rgba(255,71,87,0.04);
+            border: 1px solid rgba(255,71,87,0.1);
+            border-radius: 12px;
+            padding: 16px 20px;
+        }
+
+        /* === RETAKE COOLDOWN in Results === */
+        .retake-locked {
+            background: rgba(255,71,87,0.07);
+            border: 1px solid rgba(255,71,87,0.25);
+            border-radius: 12px;
+            padding: 14px 24px;
+            color: #ff4757;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            letter-spacing: 1px;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="bg-canvas"></canvas>
+
+    <nav class="navbar" id="navbar">
+        <a href="index.html" class="nav-brand">
+            <img src="assets/logo.png" alt="CSSC Logo" class="nav-logo"
+                onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+            <div class="nav-logo-placeholder" style="display:none;">CSSC</div>
+            <div>
+                <div class="nav-title">CSSC</div>
+                <div class="nav-subtitle">CYBER SECURITY STUDENT CLUB</div>
+            </div>
+        </a>
+        <ul class="nav-links">
+            <li><a href="index.html">Home</a></li>
+            <li><a href="about.html">About</a></li>
+            <li><a href="quiz.html" class="active">Quiz Arena</a></li>
+            <li><a href="team.html">Team</a></li>
+            <li><a href="admin.html" style="color:var(--neon-blue);font-family:var(--font-mono);font-size:0.75rem;letter-spacing:1px;">⚙ ADMIN</a></li>
+            <li><a href="register.html" class="nav-cta">Join Club</a></li>
+        </ul>
+        <button class="hamburger" id="hamburger" aria-label="Toggle menu">
+            <span></span><span></span><span></span>
+        </button>
+    </nav>
+    <nav class="mobile-nav" id="mobile-nav">
+        <a href="index.html">🏠 Home</a>
+        <a href="about.html">👨‍💻 About CSSC</a>
+        <a href="quiz.html">🧪 Quiz Arena</a>
+        <a href="team.html">👥 Team</a>
+        <a href="admin.html">⚙️ Admin Panel</a>
+        <a href="register.html">📝 Join Club</a>
+    </nav>
+
+    <!-- ===== COOLDOWN LOCKOUT ===== -->
+    <div id="cooldown-screen">
+        <div class="cooldown-wrap">
+            <span class="cooldown-icon">🔒</span>
+            <div class="cooldown-title">Access Locked</div>
+            <div class="cooldown-subtitle">COOLDOWN_PROTOCOL_ACTIVE // SESSION_RESTRICTED</div>
+
+            <div class="cooldown-timer-box">
+                <div class="cooldown-label">⚡ NEXT ATTEMPT AVAILABLE IN</div>
+                <div class="cooldown-digits">
+                    <div class="cooldown-digit" id="cd-lock-min">10</div>
+                    <div class="cooldown-colon">:</div>
+                    <div class="cooldown-digit" id="cd-lock-sec">00</div>
+                </div>
+                <div class="cooldown-module-tag" id="cd-lock-module">MODULE: CYBERSEC</div>
+                <div class="cooldown-progress-bar">
+                    <div class="cooldown-progress-fill" id="cd-lock-bar" style="width:100%"></div>
+                </div>
+            </div>
+
+            <div class="cooldown-info">
+                You must wait <strong>10 minutes</strong> between quiz attempts to maintain exam integrity.
+                This applies to both completed and auto-submitted sessions.
+                The system will automatically unlock when the cooldown expires.
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== STUDENT LOGIN OVERLAY ===== -->
+    <div id="student-login-overlay" style="display:flex;">
+        <div class="violation-card" id="auth-card" style="border-color:var(--neon-blue); box-shadow:0 0 60px rgba(0,212,255,0.15); max-width:450px;">
+            <div class="violation-icon" id="auth-icon" style="color:var(--neon-blue);">🧑‍🎓</div>
+            <div class="violation-title" id="auth-title" style="color:var(--neon-blue);">Student Login</div>
+            <div class="violation-sub" id="auth-sub" style="color:rgba(0,212,255,0.6);">AUTH_REQUIRED // CSSC_ARENA</div>
+            
+            <div class="violation-info" style="background:rgba(0,212,255,0.05); border-color:rgba(0,212,255,0.15); text-align:left;">
+                <form id="student-auth-form" style="display:flex; flex-direction:column; gap:16px;">
+                    <!-- Registration Only Fields -->
+                    <div id="reg-fields" style="display:none; flex-direction:column; gap:16px;">
+                        <div>
+                            <label style="font-family:var(--font-mono); font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:2px;">Full Name</label>
+                            <input type="text" id="student-name" style="width:100%; padding:14px; margin-top:8px; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:10px; color:white; outline:none; font-family:var(--font-mono);" placeholder="John Doe" />
+                        </div>
+                        <div>
+                            <label style="font-family:var(--font-mono); font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:2px;">Department</label>
+                            <select id="student-dept" style="width:100%; padding:14px; margin-top:8px; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:10px; color:white; outline:none; font-family:var(--font-mono); appearance:none;">
+                                <option value="" disabled selected>-- Select Dept --</option>
+                                <option value="CSE">Computer Science</option>
+                                <option value="IT">Information Technology</option>
+                                <option value="ECE">Electronics & Communication</option>
+                                <option value="Cyber">Cyber Security</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Shared Fields -->
+                    <div>
+                        <label style="font-family:var(--font-mono); font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:2px;">Email Address</label>
+                        <input type="email" id="student-email" required style="width:100%; padding:14px; margin-top:8px; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:10px; color:white; outline:none; font-family:var(--font-mono);" placeholder="student@cssc.com" />
+                    </div>
+                    <div>
+                        <label style="font-family:var(--font-mono); font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:2px;">Password</label>
+                        <input type="password" id="student-password" required style="width:100%; padding:14px; margin-top:8px; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:10px; color:white; outline:none; font-family:var(--font-mono);" placeholder="••••••••" />
+                    </div>
+
+                    <div id="auth-message" style="font-size:0.8rem; display:none; text-align:center;"></div>
+                    
+                    <button type="submit" id="auth-submit-btn" class="violation-dismiss" style="background:var(--neon-blue); margin-top:8px;">⚡ VERIFY IDENTITY</button>
+                    
+                    <div style="text-align:center; margin-top:5px;">
+                        <a href="javascript:void(0)" id="auth-toggle" style="color:var(--neon-blue); font-family:var(--font-mono); font-size:0.7rem; text-decoration:none; opacity:0.7; letter-spacing:1px;">NEW STUDENT? REGISTER HERE</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <style>
+        #student-login-overlay {
+            position: fixed; inset: 0; z-index: 9999;
+            background: rgba(10,10,15,0.95);
+            backdrop-filter: blur(10px);
+            align-items: center; justify-content: center;
+        }
+        #student-login-form input:focus { border-color: var(--neon-blue) !important; }
+    </style>
+
+    <!-- ===== LOBBY ===== -->
+    <div id="quiz-lobby">
+        <section class="quiz-hero">
+            <div class="quiz-lobby">
+                <!-- LEFT: Info -->
+                <div class="lobby-left">
+                    <div class="lobby-tag">// QUIZ_ARENA_SYSTEM_ACTIVE</div>
+                    <h1 class="lobby-title">CSSC <span>Quiz</span><br />Arena</h1>
+                    <p class="lobby-desc">Test your cybersecurity knowledge in a secure, AI-proctored exam environment. Questions are randomized for every session and your performance is logged.</p>
+                    <div class="lobby-badges">
+                        <span class="lobby-badge green">🛡 Anti-Cheat Active</span>
+                        <span class="lobby-badge blue">⏱ Timed Assessment</span>
+                        <span class="lobby-badge">🔀 Randomized Q&A</span>
+                        <span class="lobby-badge">📊 Score Tracked</span>
+                        <span class="lobby-badge" style="border-color:rgba(255,71,87,0.4);color:#ff4757;">🔒 10-Min Cooldown</span>
+                    </div>
+                </div>
+
+                <!-- RIGHT: Config -->
+                <div class="lobby-right">
+                    <div>
+                        <div class="lobby-sec-title">// EXAMINATION_RULES</div>
+                        <div class="quiz-rule"><div class="quiz-rule-dot"></div><span>System will request <strong>Fullscreen Mode</strong> once started.</span></div>
+                        <div class="quiz-rule"><div class="quiz-rule-dot"></div><span>Switching tabs will trigger a <strong>Security Violation</strong>.</span></div>
+                        <div class="quiz-rule"><div class="quiz-rule-dot"></div><span>3 violations = <strong>Auto-Submission</strong> of your quiz.</span></div>
+                        <div class="quiz-rule"><div class="quiz-rule-dot"></div><span>Right-click and copy-paste are <strong>disabled</strong> during the exam.</span></div>
+                        <div class="quiz-rule"><div class="quiz-rule-dot" style="background:#ff4757"></div><span>A <strong>10-minute cooldown</strong> is enforced between all attempts.</span></div>
+                    </div>
+
+                    <!-- Round Progression Cards -->
+                    <style>
+                        .round-card { background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; transition: all 0.2s; }
+                        .round-card.available { border-color: rgba(0,255,136,0.35); }
+                        .round-card.available:hover { background: rgba(0,255,136,0.05); border-color: rgba(0,255,136,0.65); }
+                        .round-card.completed { border-color: rgba(0,212,255,0.4); }
+                        .round-card.locked { opacity: 0.42; }
+                        .round-card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+                        .round-label { font-family: var(--font-mono); font-size: 0.6rem; letter-spacing: 3px; color: var(--text-muted); text-transform: uppercase; }
+                        .round-badge { font-family: var(--font-mono); font-size: 0.58rem; letter-spacing: 2px; padding: 3px 9px; border-radius: 20px; }
+                        .round-badge.avail { color: var(--neon-green); border: 1px solid rgba(0,255,136,0.4); background: rgba(0,255,136,0.07); }
+                        .round-badge.done  { color: var(--neon-blue);  border: 1px solid rgba(0,212,255,0.4); background: rgba(0,212,255,0.07); }
+                        .round-badge.lock  { color: var(--text-muted); border: 1px solid var(--border);       background: transparent; }
+                        .round-title { font-size: 0.9rem; font-weight: 700; color: var(--text-primary); margin-bottom: 3px; }
+                        .round-meta  { font-family: var(--font-mono); font-size: 0.6rem; color: var(--text-muted); letter-spacing: 1px; margin-bottom: 11px; }
+                        .round-start-btn { width: 100%; padding: 10px; border-radius: 8px; border: none; background: var(--neon-green); color: #0a0a0f; font-weight: 700; font-size: 0.82rem; letter-spacing: 1px; cursor: pointer; transition: all 0.2s; }
+                        .round-start-btn:hover:not(:disabled) { background: #00ffaa; transform: translateY(-1px); }
+                        .round-start-btn:disabled { background: rgba(255,255,255,0.06); color: var(--text-muted); cursor: not-allowed; transform: none; }
+                    </style>
+                    <div id="round-cards" style="display:flex;flex-direction:column;gap:10px;">
+                        <div class="round-card" id="round-card-1">
+                            <div class="round-card-top">
+                                <div class="round-label">ROUND 01</div>
+                                <div class="round-badge" id="round-badge-1">LOADING…</div>
+                            </div>
+                            <div class="round-title">Cyber Awareness Fundamentals</div>
+                            <div class="round-meta">25 Questions · 10 min</div>
+                            <button class="round-start-btn" id="start-btn-1" onclick="handleRoundStart(1)">🚀 START ROUND 1</button>
+                        </div>
+                        <div class="round-card" id="round-card-2">
+                            <div class="round-card-top">
+                                <div class="round-label">ROUND 02</div>
+                                <div class="round-badge" id="round-badge-2">LOADING…</div>
+                            </div>
+                            <div class="round-title">Networking &amp; Security Core</div>
+                            <div class="round-meta">20 Questions · 8 min</div>
+                            <button class="round-start-btn" id="start-btn-2" onclick="handleRoundStart(2)">🔒 LOCKED</button>
+                        </div>
+                        <div class="round-card" id="round-card-3">
+                            <div class="round-card-top">
+                                <div class="round-label">ROUND 03</div>
+                                <div class="round-badge" id="round-badge-3">LOADING…</div>
+                            </div>
+                            <div class="round-title">Advanced Security &amp; Systems</div>
+                            <div class="round-meta">20 Questions · 7 min</div>
+                            <button class="round-start-btn" id="start-btn-3" onclick="handleRoundStart(3)">🔒 LOCKED</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- ===== QUIZ ENGINE ===== -->
+    <div id="quiz-engine">
+        <div class="engine-wrap">
+            <div class="engine-header">
+                <div class="engine-meta">
+                    <div class="engine-tag" id="engine-category">CYBERSEC // MODULE_01</div>
+                    <div class="engine-title" id="engine-title">Cyber Security Fundamentals</div>
+                </div>
+                <div class="engine-timer">
+                    <span class="timer-icon">⏱</span>
+                    <span class="timer-val" id="timer-display">08:00</span>
+                </div>
+            </div>
+
+            <div class="progress-wrap">
+                <div class="progress-meta">
+                    <span id="progress-text">Question 1 of 10</span>
+                    <span id="progress-pct">0%</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+                </div>
+            </div>
+
+            <div class="question-card">
+                <div class="question-num" id="question-num">QUESTION_DATA_STREAM_01</div>
+                <div class="question-text" id="question-text">Loading question...</div>
+            </div>
+
+            <div class="options-grid" id="options-grid"></div>
+
+            <div class="engine-footer">
+                <div class="violation-badge" id="violation-badge">⚠ VIOLATIONS: 0 / 3</div>
+                <button class="next-btn" id="next-btn" disabled>NEXT SEQUENCE →</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== RESULTS ===== -->
+    <div id="quiz-results">
+        <div class="results-wrap">
+            <div class="result-badge-wrap">
+                <div class="result-icon" id="result-icon">🏆</div>
+                <div class="result-title" id="result-title">Assessment Complete</div>
+                <div style="font-family:var(--font-mono);font-size:0.65rem;letter-spacing:3px;color:var(--text-muted);" id="result-sub">PERFORMANCE_REPORT_GENERATED</div>
+            </div>
+
+            <div class="result-score" id="result-score">0%</div>
+
+            <div class="result-stats">
+                <div class="result-stat">
+                    <div class="result-stat-val" id="stat-correct" style="color:var(--neon-green)">0</div>
+                    <div class="result-stat-label">Correct</div>
+                </div>
+                <div class="result-stat">
+                    <div class="result-stat-val" id="stat-wrong" style="color:#ff4757">0</div>
+                    <div class="result-stat-label">Wrong</div>
+                </div>
+                <div class="result-stat">
+                    <div class="result-stat-val" id="stat-violations" style="color:var(--neon-blue)">0</div>
+                    <div class="result-stat-label">Violations</div>
+                </div>
+            </div>
+
+            <div class="result-actions" id="result-actions">
+                <div id="retake-btn-wrap">
+                    <!-- Dynamically replaced with cooldown notice or retake button -->
+                    <a href="quiz.html" class="btn btn-primary">🔄 Retake Quiz</a>
+                </div>
+                <a href="index.html" class="btn btn-secondary">🏠 Back to Home</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== VIOLATION OVERLAY ===== -->
+    <div id="violation-overlay">
+        <div class="violation-card">
+            <div class="violation-icon">🚨</div>
+            <div class="violation-title">Security Violation</div>
+            <div class="violation-sub">PROTOCOL_BREACH_DETECTED</div>
+            <div class="violation-info">
+                You have left the quiz window or exited fullscreen mode. This has been logged as a security violation.
+                Please return to fullscreen immediately.
+            </div>
+            <div class="violation-count" id="violation-count-display">WARNINGS REMAINING: 3 / 3</div>
+            <br />
+            <button class="violation-dismiss" id="dismiss-violation">⚡ RE-INITIALIZE SYSTEM</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+    <script>
+    /* ============================================================
+       CSSC QUIZ ENGINE — Inline Script
+       ============================================================ */
+    (function () {
+        // ─── AUTHENTICATION LOGIC (Login & Register) ────────────
+        const LOGIN_KEY = 'cssc_student_token';
+        const overlay = document.getElementById('student-login-overlay');
+        const authForm = document.getElementById('student-auth-form');
+        const authMsg = document.getElementById('auth-message');
+        const toggleBtn = document.getElementById('auth-toggle');
+        const regFields = document.getElementById('reg-fields');
+        const authTitle = document.getElementById('auth-title');
+        const authBtn = document.getElementById('auth-submit-btn');
+        
+        let isRegisterMode = false;
+
+        if (sessionStorage.getItem(LOGIN_KEY)) {
+            overlay.style.display = 'none';
+        }
+
+        // Toggle Login/Register
+        toggleBtn.addEventListener('click', () => {
+            isRegisterMode = !isRegisterMode;
+            regFields.style.display = isRegisterMode ? 'flex' : 'none';
+            authTitle.textContent = isRegisterMode ? 'Student Registration' : 'Student Login';
+            authBtn.textContent = isRegisterMode ? '🚀 CREATE ACCOUNT' : '⚡ VERIFY IDENTITY';
+            toggleBtn.textContent = isRegisterMode ? 'ALREADY REGISTERED? LOGIN' : 'NEW STUDENT? REGISTER HERE';
+            authMsg.style.display = 'none';
+            
+            // Toggle required attributes
+            document.getElementById('student-name').required = isRegisterMode;
+            document.getElementById('student-dept').required = isRegisterMode;
+        });
+
+        authForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('student-email').value.trim();
+            const password = document.getElementById('student-password').value;
+            
+            authMsg.style.display = 'none';
+            authMsg.style.color = 'white';
+            authBtn.disabled = true;
+            authBtn.textContent = '⌛ PROCESSING...';
+
+            try {
+                if (isRegisterMode) {
+                    const name = document.getElementById('student-name').value.trim();
+                    const department = document.getElementById('student-dept').value;
+                    
+                    const res = await fetch('http://localhost:5003/api/quiz/register', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name, email, password, department })
+                    });
+                    
+                    const text = await res.text();
+                    let data;
+                    try {
+                        data = JSON.parse(text);
+                    } catch (e) {
+                        console.error('Non-JSON Response:', text);
+                        throw new Error('Server returned invalid data format.');
+                    }
+
+                    if (data.success) {
+                        // Switch to Login Mode for manual verification
+                        isRegisterMode = false;
+                        regFields.style.display = 'none';
+                        authTitle.textContent = 'Student Login';
+                        authBtn.textContent = '⚡ VERIFY IDENTITY';
+                        toggleBtn.textContent = 'NEW STUDENT? REGISTER HERE';
+                        
+                        // Clear password and reset requirements
+                        document.getElementById('student-password').value = '';
+                        document.getElementById('student-name').required = false;
+                        document.getElementById('student-dept').required = false;
+
+                        authMsg.style.color = '#00ffaa';
+                        authMsg.textContent = 'Registration Successful! Please login to continue.';
+                        authMsg.style.display = 'block';
+                        authBtn.disabled = false;
+                    } else {
+                        throw new Error(data.message || 'Registration failed');
+                    }
+                } else {
+                    await performLogin(email, password);
+                }
+            } catch (err) {
+                authMsg.style.color = '#ff4757';
+                authMsg.textContent = err.message || 'Connection failed.';
+                authMsg.style.display = 'block';
+                authBtn.disabled = false;
+                authBtn.textContent = isRegisterMode ? '🚀 CREATE ACCOUNT' : '⚡ VERIFY IDENTITY';
+            }
+        });
+
+        async function performLogin(email, password) {
+            try {
+                const res = await fetch('http://localhost:5003/api/quiz/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    sessionStorage.setItem(LOGIN_KEY, data.user.id);
+                    // Store full user object so finishQuiz() can read name/email/dept
+                    sessionStorage.setItem('cssc_student_user', JSON.stringify(data.user));
+                    overlay.style.display = 'none';
+                } else {
+                    throw new Error(data.message || 'Invalid credentials.');
+                }
+            } catch (err) {
+                throw err;
+            }
+        }
+
+        // ─── ROUND QUESTION BANK ─────────────────────────────────
+        const ROUNDS = {
+            1: {
+                title: 'Cyber Awareness Fundamentals',
+                category: 'ROUND 01 // AWARENESS',
+                timeMin: 10,
+                questions: [
+                    { q: 'You receive a message: "Your bank account will be blocked in 10 minutes. Click here to verify." What should you do?', opts: ['Click quickly to verify', 'Ignore and report it', 'Share your OTP', 'Forward to friends'], ans: 1 },
+                    { q: 'You find a USB drive in the college parking lot. What is the safest action?', opts: ['Plug it into your laptop', 'Give it to the IT department', 'Scan then open it', 'Use it in the lab PC'], ans: 1 },
+                    { q: 'A website URL looks like: www.paytm-secure-login.xyz — What does this indicate?', opts: ['Official backup server', 'Temporary server', 'Suspicious / phishing domain', 'Fast login portal'], ans: 2 },
+                    { q: 'You get an OTP on your phone without requesting it. What does this likely mean?', opts: ['Auto refresh issue', 'Someone is attempting to log into your account', 'Network delay', 'SIM error'], ans: 1 },
+                    { q: 'Which action is safest when connected to public WiFi?', opts: ['Do your bank login', 'Use only HTTPS websites', 'Disable your firewall', 'Share your hotspot'], ans: 1 },
+                    { q: 'You see a QR code in college offering a "Free Gift". What should you do?', opts: ['Scan immediately for reward', 'Ignore and verify the source first', 'Scan with any app', 'Share it with friends'], ans: 1 },
+                    { q: 'A friend urgently asks you to share your password for a submission. What do you do?', opts: ['Share it once', 'Share it temporarily', 'Refuse politely', 'Share OTP instead'], ans: 2 },
+                    { q: 'Which of the following is a strong password?', opts: ['ganesh@123', 'P@ssword', 'T!m3#S3cur3_2026', 'admin@123'], ans: 2 },
+                    { q: 'Which is a clear sign of a phishing email?', opts: ['Urgent action required — act now!', 'Contains a known company logo', 'Proper email format', 'Personalised greeting'], ans: 0 },
+                    { q: 'What is the safest method to store your passwords?', opts: ['Browser autofill', 'Write them in a notebook', 'Use a Password Manager app', 'Save in email drafts'], ans: 2 },
+                    { q: 'What does HTTPS mainly ensure in a web connection?', opts: ['Faster page loading', 'Encrypted communication', 'No hacking is possible', 'Ownership is verified'], ans: 1 },
+                    { q: 'A job offer email asks you to pay a fee to confirm the position. This is most likely:', opts: ['A registration fee', 'An internship fee', 'A scam attempt', 'An HR verification process'], ans: 2 },
+                    { q: 'Which action most improves your account security?', opts: ['Reuse passwords across sites', 'Use simple passwords', 'Enable Multi-Factor Authentication (MFA)', 'Share login with trusted friends'], ans: 2 },
+                    { q: 'A popup says: "Your phone has viruses! Click to clean." What should you do?', opts: ['Click the button immediately', 'Ignore the popup', 'Install the suggested app', 'Restart the phone only'], ans: 1 },
+                    { q: 'Which represents the safest login option?', opts: ['An HTTP site', 'An unknown domain site', 'The official HTTPS site', 'Shared credentials on HTTP'], ans: 2 },
+                    { q: 'Which protocol is connection-oriented and guarantees delivery?', opts: ['UDP', 'TCP', 'FTP', 'DNS'], ans: 1 },
+                    { q: 'Which port is used by HTTPS?', opts: ['21', '22', '80', '443'], ans: 3 },
+                    { q: 'What does DNS primarily do?', opts: ['Encrypts data in transit', 'Converts domain names to IP addresses', 'Blocks malware', 'Scans for open ports'], ans: 1 },
+                    { q: 'Which of the following is a private IP address?', opts: ['8.8.8.8', '192.168.0.5', '1.1.1.1', '54.23.12.1'], ans: 1 },
+                    { q: 'What does a firewall mainly do?', opts: ['Speed up internet', 'Block unauthorized network access', 'Store passwords securely', 'Encrypt all files'], ans: 1 },
+                    { q: 'Which tool is used for network scanning and port discovery?', opts: ['Excel', 'Nmap', 'VLC', 'Paint'], ans: 1 },
+                    { q: 'Which attack rapidly tries many different passwords against an account?', opts: ['Phishing', 'Brute Force', 'XSS', 'DoS'], ans: 1 },
+                    { q: 'Which attack floods a server with traffic to make it unavailable?', opts: ['SQL Injection', 'DoS (Denial of Service)', 'CSRF', 'Clickjacking'], ans: 1 },
+                    { q: 'If user input is directly run as a script in the browser, the attack is called:', opts: ['SQL Injection', 'XSS (Cross-Site Scripting)', 'Phishing', 'Brute Force'], ans: 1 },
+                    { q: 'A user logs in from India and 2 minutes later from the USA. This is flagged as:', opts: ['Network lag', 'Impossible travel / account compromise', 'A server error', 'A VPN issue'], ans: 1 }
+                ]
+            },
+            2: {
+                title: 'Networking & Security Core',
+                category: 'ROUND 02 // NETWORKING',
+                timeMin: 8,
+                questions: [
+                    { q: 'Which protocol ensures reliable, connection-oriented data transfer?', opts: ['UDP', 'TCP', 'ARP', 'ICMP'], ans: 1 },
+                    { q: 'Which OSI layer is responsible for encryption and data formatting?', opts: ['Network', 'Transport', 'Presentation', 'Data Link'], ans: 2 },
+                    { q: 'Which command is used to scan open ports on a system?', opts: ['ping', 'netstat', 'nmap', 'ipconfig'], ans: 2 },
+                    { q: 'DNS failure primarily affects which service first?', opts: ['Email via IP', 'Website access via domain name', 'FTP transfers', 'SSH connections'], ans: 1 },
+                    { q: 'What is the correct binary representation of 192.168.1.1?', opts: ['11000000.10101000.00000001.00000001', '11000000.10101000.00000001.00000010', '11000001.10101000.00000001.00000001', '11000000.10101000.00000010.00000001'], ans: 0 },
+                    { q: 'Which port does DNS use by default?', opts: ['21', '25', '53', '110'], ans: 2 },
+                    { q: 'Many SYN packets sent with no ACK response is characteristic of which attack?', opts: ['MITM', 'SYN Flood', 'SQL Injection', 'ARP Poisoning'], ans: 1 },
+                    { q: 'Which protocol dynamically assigns IP addresses to devices on a network?', opts: ['DNS', 'DHCP', 'SMTP', 'FTP'], ans: 1 },
+                    { q: 'Which tool is primarily used for packet capture and network analysis?', opts: ['Nmap', 'Wireshark', 'Burp Suite', 'Metasploit'], ans: 1 },
+                    { q: 'What does ARP (Address Resolution Protocol) primarily do?', opts: ['Encrypts data', 'Maps IP addresses to MAC addresses', 'Resolves domain names', 'Blocks threats'], ans: 1 },
+                    { q: 'What does HTTP status code 401 mean?', opts: ['OK', 'Redirect', 'Unauthorized', 'Not Found'], ans: 2 },
+                    { q: 'Which algorithm is commonly used for secure password hashing?', opts: ['AES', 'RSA', 'SHA-256', 'FTP'], ans: 2 },
+                    { q: 'What subnet mask supports exactly 254 usable hosts on a network?', opts: ['255.255.255.0', '255.255.0.0', '255.255.255.128', '255.0.0.0'], ans: 0 },
+                    { q: 'Which network device decides the best path for forwarding data packets?', opts: ['Hub', 'Switch', 'Router', 'Firewall'], ans: 2 },
+                    { q: 'Which attack type intercepts communication between two parties secretly?', opts: ['Phishing', 'Brute Force', 'Man-in-the-Middle (MITM)', 'DoS'], ans: 2 },
+                    { q: 'Which protocol provides secure and encrypted web browsing?', opts: ['HTTP', 'FTP', 'HTTPS', 'SMTP'], ans: 2 },
+                    { q: 'Which Windows command displays the current IP configuration?', opts: ['ifconfig', 'ipconfig', 'netstat', 'ping'], ans: 1 },
+                    { q: 'Which device operates at the Data Link layer and forwards frames by MAC address?', opts: ['Router', 'Switch', 'Firewall', 'Gateway'], ans: 1 },
+                    { q: 'Creating a fake website to steal user credentials is known as:', opts: ['DoS', 'MITM', 'Phishing', 'SQL Injection'], ans: 2 },
+                    { q: 'Which port does HTTP use by default?', opts: ['21', '25', '80', '443'], ans: 2 }
+                ]
+            },
+            3: {
+                title: 'Advanced Security & Systems',
+                category: 'ROUND 03 // ADVANCED',
+                timeMin: 7,
+                questions: [
+                    { q: 'Which data structure is most efficient for a firewall to look up blocked IP addresses?', opts: ['Array', 'Stack', 'Hash Set', 'Queue'], ans: 2 },
+                    { q: 'A server receives many SYN requests but never receives ACK responses. This is a:', opts: ['MITM attack', 'SYN Flood attack', 'DNS Poisoning attack', 'Phishing attack'], ans: 1 },
+                    { q: 'What is the output of C++ expression: a+++ a++ when int a = 5?', opts: ['6', '7', 'Undefined Behaviour', '5'], ans: 2 },
+                    { q: 'Which search algorithm performs best on a sorted array?', opts: ['Linear Search', 'Bubble Sort', 'Binary Search', 'DFS'], ans: 2 },
+                    { q: 'User input is directly concatenated into a SQL query without sanitization. The vulnerability is:', opts: ['XSS', 'SQL Injection', 'DoS', 'CSRF'], ans: 1 },
+                    { q: 'Which security principle does process isolation primarily improve?', opts: ['Speed', 'Security', 'Storage efficiency', 'UI responsiveness'], ans: 1 },
+                    { q: 'Which OSI layer is responsible for routing packets across different networks?', opts: ['Transport', 'Network', 'Physical', 'Session'], ans: 1 },
+                    { q: 'Which data structure provides the best average-case O(1) lookup time?', opts: ['Linked List', 'Hash Table', 'Stack', 'Queue'], ans: 1 },
+                    { q: 'Port 3306 is typically associated with which database service?', opts: ['SSH', 'HTTP', 'MySQL', 'FTP'], ans: 2 },
+                    { q: 'For IP address 10.0.0.5 with a /8 prefix, what is the network address?', opts: ['10.0.0.0', '10.1.0.0', '10.0.1.0', '0.0.0.0'], ans: 0 },
+                    { q: 'Which C function should replace gets() to prevent buffer overflow?', opts: ['gets()', 'scanf()', 'fgets()', 'strcpy()'], ans: 2 },
+                    { q: 'The MD5 hash 098f6bcd4621d373cade4e83262 is the hash of which string?', opts: ['test', 'admin', 'root', 'pass'], ans: 0 },
+                    { q: 'Which algorithm finds the shortest weighted path in a graph?', opts: ['BFS', 'DFS', "Dijkstra's Algorithm", 'Stack traversal'], ans: 2 },
+                    { q: 'Which attack secretly intercepts and possibly alters communication between two parties?', opts: ['Man-in-the-Middle (MITM)', 'Phishing', 'DoS', 'XSS'], ans: 0 },
+                    { q: 'Using stolen credentials (same password) across many accounts at scale is called:', opts: ['Brute Force', 'Credential Stuffing', 'MITM', 'IP Spoofing'], ans: 1 },
+                    { q: 'Which technique prevents deadlocks in operating systems?', opts: ['Circular wait removal', 'Adding more RAM', 'Using a faster CPU', 'Adding more cache'], ans: 0 },
+                    { q: 'A Stack data structure follows which ordering principle?', opts: ['FIFO', 'LIFO', 'Random access', 'Priority-based'], ans: 1 },
+                    { q: 'Which tool is used for deep network packet capture and analysis?', opts: ['Nmap', 'Wireshark', 'Netcat', 'Ping'], ans: 1 },
+                    { q: 'To handle 1 million requests per second reliably, the best architecture is:', opts: ['Single powerful server', 'Distributed system', 'Manual processing', 'Offline batch processing'], ans: 1 },
+                    { q: 'Which combination improves BOTH performance and security of a web application?', opts: ['Caching + Rate Limiting', 'Firewall only', 'Encryption only', 'Antivirus only'], ans: 0 }
+                ]
+            }
+        };
+
+
+
+        // ─── CONSTANTS ────────────────────────────────────────────
+        const COOLDOWN_KEY   = 'cssc_quiz_cooldown'; // localStorage key → { moduleKey: expiryTimestampMs }
+        const MAX_VIOLATIONS = 1; // Immediate termination upon violation (tab change)
+
+        // ─── STATE ────────────────────────────────────────────────
+        let state = null;
+        let timerInterval    = null;
+        let cooldownInterval = null;
+        let violations = 0;
+
+        // ─── ELEMENTS ─────────────────────────────────────────────
+        const lobby            = document.getElementById('quiz-lobby');
+        const cooldownScreen   = document.getElementById('cooldown-screen');
+        const engine           = document.getElementById('quiz-engine');
+        const resultsEl        = document.getElementById('quiz-results');
+        const violationOverlay = document.getElementById('violation-overlay');
+        const startBtn         = document.getElementById('start-quiz-btn');
+        const selectorEl       = document.getElementById('quiz-selector');
+        const nextBtn          = document.getElementById('next-btn');
+        const dismissBtn       = document.getElementById('dismiss-violation');
+        const timerDisplay     = document.getElementById('timer-display');
+        const progressFill     = document.getElementById('progress-fill');
+        const progressText     = document.getElementById('progress-text');
+        const progressPct      = document.getElementById('progress-pct');
+        const questionNum      = document.getElementById('question-num');
+        const questionText     = document.getElementById('question-text');
+        const optionsGrid      = document.getElementById('options-grid');
+        const violationBadge   = document.getElementById('violation-badge');
+        const violationCountEl = document.getElementById('violation-count-display');
+        const engineTitle      = document.getElementById('engine-title');
+        const engineCategory   = document.getElementById('engine-category');
+        const moduleCooldownNotice = document.getElementById('module-cooldown-notice');
+
+        // ─── COOLDOWN HELPERS ─────────────────────────────────────
+        function getCooldowns() {
+            try { return JSON.parse(localStorage.getItem(COOLDOWN_KEY)) || {}; }
+            catch { return {}; }
+        }
+
+        function setCooldown(moduleKey, durationMs) {
+            const data = getCooldowns();
+            data[moduleKey] = Date.now() + durationMs;
+            localStorage.setItem(COOLDOWN_KEY, JSON.stringify(data));
+        }
+
+        function getCooldownRemaining(moduleKey) {
+            const data = getCooldowns();
+            if (!data[moduleKey]) return 0;
+            const remaining = data[moduleKey] - Date.now();
+            return remaining > 0 ? remaining : 0;
+        }
+
+        // Returns the module with the longest remaining cooldown (global lockout)
+        function getActiveCooldown() {
+            const data = getCooldowns();
+            let max = { key: null, remaining: 0 };
+            Object.keys(data).forEach(k => {
+                const r = getCooldownRemaining(k);
+                if (r > max.remaining) max = { key: k, remaining: r };
+            });
+            return max;
+        }
+
+        // ─── ROUND PROGRESSION HELPERS ────────────────────────────
+        const PROGRESS_KEY = 'cssc_round_progress';
+
+        function getProgress() {
+            try { return JSON.parse(localStorage.getItem(PROGRESS_KEY)) || { completedRounds: [] }; }
+            catch { return { completedRounds: [] }; }
+        }
+        function markRoundComplete(roundNum) {
+            const p = getProgress();
+            if (!p.completedRounds.includes(roundNum)) p.completedRounds.push(roundNum);
+            localStorage.setItem(PROGRESS_KEY, JSON.stringify(p));
+        }
+        function isRoundUnlocked(r) { return r === 1 || getProgress().completedRounds.includes(r - 1); }
+        function isRoundCompleted(r) { return getProgress().completedRounds.includes(r); }
+
+        // ─── ROUND CARD UI UPDATE ─────────────────────────────────
+        function updateRoundCards() {
+            for (let r = 1; r <= 3; r++) {
+                const card  = document.getElementById(`round-card-${r}`);
+                const badge = document.getElementById(`round-badge-${r}`);
+                const btn   = document.getElementById(`start-btn-${r}`);
+                if (!card) continue;
+                const unlocked  = isRoundUnlocked(r);
+                const completed = isRoundCompleted(r);
+                const coolRem   = getCooldownRemaining(`round${r}`);
+                card.className = 'round-card';
+                if (completed) {
+                    card.classList.add('completed');
+                    badge.className = 'round-badge done'; badge.textContent = '✓ COMPLETED';
+                    btn.disabled = true; btn.textContent = '✓ ROUND DONE';
+                } else if (!unlocked) {
+                    card.classList.add('locked');
+                    badge.className = 'round-badge lock'; badge.textContent = '🔒 LOCKED';
+                    btn.disabled = true; btn.textContent = '🔒 COMPLETE PREVIOUS ROUND';
+                } else if (coolRem > 0) {
+                    card.classList.add('available');
+                    const m = Math.floor(coolRem / 60000), s = Math.floor((coolRem % 60000) / 1000);
+                    badge.className = 'round-badge lock';
+                    badge.textContent = `⏳ ${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+                    btn.disabled = true; btn.textContent = '⏳ COOLDOWN ACTIVE';
+                } else {
+                    card.classList.add('available');
+                    badge.className = 'round-badge avail'; badge.textContent = '▶ AVAILABLE';
+                    btn.disabled = false; btn.textContent = `🚀 START ROUND ${r}`;
+                }
+            }
+        }
+        setInterval(updateRoundCards, 1000);
+        updateRoundCards();
+
+        // ─── GLOBAL COOLDOWN LOCKOUT SCREEN ───────────────────────
+        function showGlobalCooldown(key, remainingMs) {
+            lobby.style.display = 'none';
+            cooldownScreen.classList.add('show');
+            
+            const names = { round1: 'ROUND 01', round2: 'ROUND 02', round3: 'ROUND 03' };
+            document.getElementById('cd-lock-module').textContent = `MODULE: ${names[key] || key}`;
+            
+            // Extract round number from key to find original timeMin duration
+            let rNum = 1; 
+            if (key.includes('2')) rNum = 2;
+            if (key.includes('3')) rNum = 3;
+            const fullDurationMs = (ROUNDS[rNum]?.timeMin || 10) * 60 * 1000;
+
+            clearInterval(cooldownInterval);
+            cooldownInterval = setInterval(() => {
+                const active = getActiveCooldown();
+                if (active.remaining <= 0) {
+                    clearInterval(cooldownInterval);
+                    cooldownScreen.classList.remove('show');
+                    lobby.style.display = 'block';
+                    updateRoundCards();
+                    return;
+                }
+                const mins = Math.floor(active.remaining / 60000);
+                const secs = Math.floor((active.remaining % 60000) / 1000);
+                document.getElementById('cd-lock-min').textContent = String(mins).padStart(2, '0');
+                document.getElementById('cd-lock-sec').textContent = String(secs).padStart(2, '0');
+                document.getElementById('cd-lock-bar').style.width = ((active.remaining / fullDurationMs) * 100) + '%';
+            }, 1000);
+
+            const mins = Math.floor(remainingMs / 60000);
+            const secs = Math.floor((remainingMs % 60000) / 1000);
+            document.getElementById('cd-lock-min').textContent = String(mins).padStart(2, '0');
+            document.getElementById('cd-lock-sec').textContent = String(secs).padStart(2, '0');
+            document.getElementById('cd-lock-bar').style.width = ((remainingMs / fullDurationMs) * 100) + '%';
+        }
+
+        // Check on page load
+        (function checkOnLoad() {
+            const active = getActiveCooldown();
+            if (active.remaining > 0) showGlobalCooldown(active.key, active.remaining);
+        })();
+
+        // ─── HELPERS ──────────────────────────────────────────────
+        function shuffle(arr) {
+            const a = [...arr];
+            for (let i = a.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [a[i], a[j]] = [a[j], a[i]];
+            }
+            return a;
+        }
+
+        function requestFullscreen() {
+            const el = document.documentElement;
+            if (el.requestFullscreen) el.requestFullscreen();
+            else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+            else if (el.mozRequestFullScreen) el.mozRequestFullScreen();
+        }
+
+        function formatTime(seconds) {
+            const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+            const s = (seconds % 60).toString().padStart(2, '0');
+            return `${m}:${s}`;
+        }
+
+        // ─── HANDLE ROUND START (called from round card buttons) ──
+        window.handleRoundStart = function(roundNum) {
+            if (!isRoundUnlocked(roundNum) || isRoundCompleted(roundNum)) return;
+            if (getCooldownRemaining(`round${roundNum}`) > 0) return;
+
+            const round = ROUNDS[roundNum];
+            violations = 0;
+
+            state = {
+                roundNum,
+                quizKey: `round${roundNum}`,
+                questions: shuffle(round.questions).map(q => {
+                    const indices = [0, 1, 2, 3];
+                    const shuffledIdx = shuffle(indices);
+                    const newOpts = shuffledIdx.map(i => q.opts[i]);
+                    const newAns = shuffledIdx.indexOf(q.ans);
+                    return { q: q.q, opts: newOpts, ans: newAns };
+                }),
+                current: 0,
+                selected: null,
+                correct: 0,
+                timeLeft: round.timeMin * 60
+            };
+
+            engineTitle.textContent = round.title;
+            engineCategory.textContent = round.category;
+
+            lobby.style.display = 'none';
+            engine.style.display = 'block';
+            window.scrollTo(0, 0);
+            requestFullscreen();
+            startAntiCheat();
+            startTimer();
+            renderQuestion();
+        };
+
+
+        // ─── ANTI-CHEAT ───────────────────────────────────────────
+        function startAntiCheat() {
+            document.addEventListener('visibilitychange', handleViolation);
+            window.addEventListener('blur', handleViolation);
+            document.addEventListener('contextmenu', e => e.preventDefault());
+            document.addEventListener('copy', e => e.preventDefault());
+
+            document.addEventListener('fullscreenchange', () => {
+                if (!document.fullscreenElement && state && !state.ended) handleViolation();
+            });
+        }
+
+        function handleViolation() {
+            if (!state || state.ended) return;
+            violations++;
+            violationBadge.textContent = `⚠ VIOLATIONS: ${violations} / 3`;
+            violationCountEl.textContent = `WARNINGS REMAINING: ${MAX_VIOLATIONS - violations} / ${MAX_VIOLATIONS}`;
+            violationOverlay.classList.add('show');
+            if (violations >= MAX_VIOLATIONS) {
+                setTimeout(() => finishQuiz(true), 1500);
+            }
+        }
+
+        dismissBtn.addEventListener('click', () => {
+            violationOverlay.classList.remove('show');
+            requestFullscreen();
+        });
+
+        // ─── TIMER ────────────────────────────────────────────────
+        function startTimer() {
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                state.timeLeft--;
+                timerDisplay.textContent = formatTime(state.timeLeft);
+                if (state.timeLeft <= 60) timerDisplay.classList.add('warning');
+                if (state.timeLeft <= 0) finishQuiz(true);
+            }, 1000);
+        }
+
+        // ─── RENDER ───────────────────────────────────────────────
+        function renderQuestion() {
+            const q = state.questions[state.current];
+            const total = state.questions.length;
+            const pct = Math.round((state.current / total) * 100);
+
+            questionNum.textContent = `QUESTION_DATA_STREAM_${String(state.current + 1).padStart(2, '0')}`;
+            questionText.textContent = q.q;
+            progressText.textContent = `Question ${state.current + 1} of ${total}`;
+            progressPct.textContent = `${pct}%`;
+            progressFill.style.width = `${pct}%`;
+
+            state.selected = null;
+            nextBtn.disabled = true;
+            nextBtn.className = 'next-btn';
+
+            optionsGrid.innerHTML = '';
+            q.opts.forEach((opt, i) => {
+                const btn = document.createElement('button');
+                btn.className = 'option-btn';
+                btn.innerHTML = `<span class="option-letter">${String.fromCharCode(65 + i)}</span>${opt}`;
+                btn.addEventListener('click', () => selectOption(i));
+                optionsGrid.appendChild(btn);
+            });
+
+            const isLast = state.current === total - 1;
+            nextBtn.textContent = isLast ? 'FINALIZE SUBMISSION ✓' : 'NEXT SEQUENCE →';
+        }
+
+        function selectOption(idx) {
+            state.selected = idx;
+            const btns = optionsGrid.querySelectorAll('.option-btn');
+            btns.forEach((b, i) => b.classList.toggle('selected', i === idx));
+            nextBtn.disabled = false;
+            nextBtn.classList.add('active');
+        }
+
+        // ─── NAVIGATE ─────────────────────────────────────────────
+        nextBtn.addEventListener('click', () => {
+            if (state.selected === null) return;
+            const q = state.questions[state.current];
+            const btns = optionsGrid.querySelectorAll('.option-btn');
+
+            // Show correct/wrong feedback
+            btns.forEach((b, i) => {
+                b.disabled = true;
+                if (i === q.ans) b.classList.add('correct');
+                else if (i === state.selected) b.classList.add('wrong');
+            });
+
+            if (state.selected === q.ans) state.correct++;
+
+            nextBtn.disabled = true;
+            setTimeout(() => {
+                state.current++;
+                if (state.current >= state.questions.length) {
+                    finishQuiz(false);
+                } else {
+                    renderQuestion();
+                }
+            }, 600);
+        });
+
+        // ─── FINISH ───────────────────────────────────────────────
+        // ─── SAVE RESULT TO FIREBASE ──────────────────────────────
+        async function saveResultToFirebase(resultData) {
+            try {
+                const db = window.__csscDb;
+                if (!db) { console.warn('Firebase not ready, skipping save.'); return; }
+                const roundNames = { 1: 'Cyber Awareness Fundamentals', 2: 'Networking & Security Core', 3: 'Advanced Security & Systems' };
+                await window.__addDoc(window.__collection(db, 'quiz_results'), {
+                    studentId:      resultData.studentId || 'unknown',
+                    name:           resultData.name      || 'Unknown',
+                    email:          resultData.email     || '',
+                    department:     resultData.department || 'General',
+                    round:          resultData.round,
+                    roundName:      roundNames[resultData.round] || `Round ${resultData.round}`,
+                    score:          resultData.score,
+                    totalQuestions: resultData.totalQuestions,
+                    percentage:     resultData.percentage,
+                    timeTakenSecs:  resultData.timeTakenSecs,
+                    violations:     resultData.violations,
+                    autoSubmitted:  resultData.autoSubmitted,
+                    status:         resultData.percentage >= 50 ? 'PASSED' : 'FAILED',
+                    sessionId:      'sess_' + Math.random().toString(36).substr(2, 9),
+                    timestamp:      window.__serverTimestamp()
+                });
+                console.log('✅ Result saved to Firebase Firestore!');
+            } catch (err) {
+                console.error('❌ Firebase save error:', err.message);
+            }
+        }
+
+        function finishQuiz(auto) {
+            state.ended = true;
+            clearInterval(timerInterval);
+            document.removeEventListener('visibilitychange', handleViolation);
+            window.removeEventListener('blur', handleViolation);
+            if (document.exitFullscreen) document.exitFullscreen();
+
+            const total = state.questions.length;
+            const correct = state.correct;
+            const wrong = total - correct;
+            const pct = Math.round((correct / total) * 100);
+            const timeTakenSecs = (ROUNDS[state.roundNum].timeMin * 60) - state.timeLeft;
+
+            // ── Always unlock the next round ──
+            markRoundComplete(state.roundNum);
+
+            // ── Set Cooldown ──
+            if (auto || violations >= MAX_VIOLATIONS) {
+                setCooldown(state.quizKey, state.timeLeft * 1000);
+            } else {
+                setCooldown(state.quizKey, 0);
+            }
+
+            // ── Save result to Firebase ──
+            const loggedUser = JSON.parse(sessionStorage.getItem('cssc_student_user') || '{}');
+            saveResultToFirebase({
+                studentId:      loggedUser.id       || sessionStorage.getItem('cssc_student_token') || 'unknown',
+                name:           loggedUser.name     || 'Unknown Student',
+                email:          loggedUser.email    || '',
+                department:     loggedUser.department || 'General',
+                round:          state.roundNum,
+                score:          correct,
+                totalQuestions: total,
+                percentage:     pct,
+                timeTakenSecs:  timeTakenSecs,
+                violations:     violations,
+                autoSubmitted:  auto || violations >= MAX_VIOLATIONS
+            });
+
+            engine.style.display = 'none';
+            resultsEl.style.display = 'block';
+            window.scrollTo(0, 0);
+
+            const scoreEl = document.getElementById('result-score');
+            const titleEl = document.getElementById('result-title');
+            const iconEl  = document.getElementById('result-icon');
+            const subEl   = document.getElementById('result-sub');
+
+            scoreEl.textContent = `${pct}%`;
+            document.getElementById('stat-correct').textContent = correct;
+            document.getElementById('stat-wrong').textContent = wrong;
+            document.getElementById('stat-violations').textContent = violations;
+
+            if (auto || violations >= MAX_VIOLATIONS) {
+                iconEl.textContent = '🔒'; titleEl.textContent = 'Auto-Submitted';
+                subEl.textContent = 'MAX_VIOLATIONS_REACHED // SESSION_LOCKED';
+                scoreEl.className = 'result-score fail';
+            } else if (pct >= 80) {
+                iconEl.textContent = '🏆'; titleEl.textContent = 'Excellent Performance!';
+                subEl.textContent = 'SECURITY_CLEARANCE: ELITE_OPERATOR';
+                scoreEl.className = 'result-score excellent';
+            } else if (pct >= 50) {
+                iconEl.textContent = '✅'; titleEl.textContent = 'Good Effort!';
+                subEl.textContent = 'SECURITY_CLEARANCE: FIELD_AGENT';
+                scoreEl.className = 'result-score good';
+            } else {
+                iconEl.textContent = '📚'; titleEl.textContent = 'Keep Practising!';
+                subEl.textContent = 'SECURITY_CLEARANCE: RECRUIT_LEVEL';
+                scoreEl.className = 'result-score fail';
+            }
+
+            // ── Show retake cooldown in results ──
+            const retakeWrap = document.getElementById('retake-btn-wrap');
+            
+            function renderRetakeState() {
+                const rem = getCooldownRemaining(state.quizKey);
+                if (rem <= 0) {
+                    if (state.roundNum < 3) {
+                        retakeWrap.innerHTML = `<a href="quiz.html" class="btn btn-primary">🚀 Round ${state.roundNum + 1} Unlocked - Return to Lobby to Start</a>`;
+                    } else {
+                        retakeWrap.innerHTML = `<a href="quiz.html" class="btn btn-primary">🔄 Return to Lobby</a>`;
+                    }
+                    return true; // clear interval
+                }
+                const m = Math.floor(rem / 60000);
+                const s = Math.floor((rem % 60000) / 1000);
+                retakeWrap.innerHTML = `
+                    <div class="retake-locked">
+                        🔒 RETAKE LOCKED &nbsp;·&nbsp; Available in
+                        <strong style="color:#ff4757;font-size:1.1em;">${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}</strong>
+                    </div>`;
+                return false;
+            }
+
+            if (!renderRetakeState()) {
+                let retakeInterval = setInterval(() => {
+                    if (renderRetakeState()) clearInterval(retakeInterval);
+                }, 1000);
+            }
+        }
+    })();
+    </script>
+
+    <!-- ===== FIREBASE SDK (ES Module) ===== -->
+    <script type="module">
+        import { initializeApp }    from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+        import { getFirestore, collection, addDoc, serverTimestamp }
+                                    from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+        const firebaseConfig = {
+            apiKey:            'AIzaSyBDzUCgdQ2go81-Z7t-Ky7_wNBQryAUC7Q',
+            authDomain:        'cssc-quizes-system.firebaseapp.com',
+            projectId:         'cssc-quizes-system',
+            storageBucket:     'cssc-quizes-system.firebasestorage.app',
+            messagingSenderId: '499593375023',
+            appId:             '1:499593375023:web:836a3ea31fe9a1c29105da',
+            measurementId:     'G-Z8WV82HQ2N'
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db  = getFirestore(app);
+
+        // Expose to non-module IIFE script
+        window.__csscDb          = db;
+        window.__addDoc          = addDoc;
+        window.__collection      = collection;
+        window.__serverTimestamp = serverTimestamp;
+
+        console.log('🔥 Firebase connected to project: cssc-quizes-system');
+    </script>
+</body>
+</html>

@@ -1,8 +1,13 @@
 {
-  "rewrites": [
+  "version": 2,
+  "builds": [
     {
-      "source": "/(.*)",
-      "destination": "/frontend/$1"
+      "src": "quiz_backend/server.js",
+      "use": "@vercel/node"
     }
+  ],
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/quiz_backend/server.js" },
+    { "src": "/(.*)",     "dest": "/frontend/$1" }
   ]
 }

@@ -778,7 +778,7 @@
                     const name = document.getElementById('student-name').value.trim();
                     const department = document.getElementById('student-dept').value;
                     
-                    const res = await fetch('http://localhost:5003/api/quiz/register', {
+                    const res = await fetch('/api/quiz/register', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ name, email, password, department })
@@ -827,7 +827,7 @@
 
         async function performLogin(email, password) {
             try {
-                const res = await fetch('http://localhost:5003/api/quiz/login', {
+                const res = await fetch('/api/quiz/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email, password })

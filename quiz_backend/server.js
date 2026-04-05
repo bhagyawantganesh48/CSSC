@@ -2,18 +2,23 @@ const express  = require('express');
 const mongoose = require('mongoose');
 const cors     = require('cors');
 const dotenv   = require('dotenv');
+const path     = require('path');
 
 dotenv.config();
 
 const app  = express();
 const PORT = process.env.PORT || 5003;
 
-// Middleware
-app.use(cors());
+// ── Middleware ────────────────────────────────────────────────────────
+app.use(cors({ origin: '*' }));        // allow all origins (frontend on Vite or file://)
 app.use(express.json());
 
+// ── API Routes ────────────────────────────────────────────────────────
 app.use('/api/quiz',  require('./routes/quizRoutes'));
 app.use('/api/admin', require('./routes/adminRoutes'));
+
+// Health-check
+app.get('/api/health', (req, res) => res.json({ status: 'ok', time: new Date() }));
 
 // 404 handler
 app.use((req, res) => {
@@ -34,16 +39,21 @@ const connectDB = async () => {
 
   let MONGODB_URI = process.env.MONGODB_URI;
 
-  if (!MONGODB_URI || MONGODB_URI.includes('<username>')) {
+  if (!MONGODB_URI || MONGODB_URI.includes('<username>') || MONGODB_URI.includes('localhost')) {
     console.log('⚠️  No valid MONGODB_URI — using in-memory server (dev only).');
     const { MongoMemoryServer } = require('mongodb-memory-server');
     const mongoServer = await MongoMemoryServer.create();
     MONGODB_URI = mongoServer.getUri();
+    // Connect FIRST, then seed
+    await mongoose.connect(MONGODB_URI, { serverSelectionTimeoutMS: 30000 });
+    isConnected = true;
+    console.log('✅ MongoDB connected');
     const { seedData } = require('./seed');
     await seedData();
+    return;
   }
 
-  await mongoose.connect(MONGODB_URI);
+  await mongoose.connect(MONGODB_URI, { serverSelectionTimeoutMS: 30000 });
   isConnected = true;
   console.log('✅ MongoDB connected');
 };
@@ -62,7 +72,10 @@ if (process.env.VERCEL) {
   // Local development — spin up the server normally
   connectDB().then(() => {
     app.listen(PORT, () => {
-      console.log(`🚀 Server running on http://localhost:${PORT}`);
+      console.log(`\n🚀 CSSC Quiz Backend running → http://localhost:${PORT}`);
+      console.log(`📊 Admin API             → http://localhost:${PORT}/api/admin/stats`);
+      console.log(`📋 Quiz Results API      → http://localhost:${PORT}/api/admin/results`);
+      console.log(`👥 Members API           → http://localhost:${PORT}/api/admin/members\n`);
     });
   }).catch(err => {
     console.error('❌ Startup Error:', err.message);

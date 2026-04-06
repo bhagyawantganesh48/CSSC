@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<meta name="description" content="CSSC Coding Arena – Solve cybersecurity coding challenges with Monaco Editor, multiple languages, and live Firebase scoring."/>
+<title>CSSC Coding Arena – Cyber Security Student Club</title>
+<link rel="stylesheet" href="styles.css"/>
+<link rel="icon" href="assets/logo.png" type="image/png"/>
+<style>
+:root{--ca-orange:#ff9f43;}
+#ca-solve-view{display:none;}
+.ca-hero{min-height:100vh;padding:120px 20px 60px;}
+.ca-wrap{max-width:1100px;margin:0 auto;}
+.ca-header{display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:32px;}
+.ca-title{font-size:clamp(1.8rem,4vw,3rem);font-weight:900;line-height:1.1;}
+.ca-title span{color:var(--ca-orange);}
+.ca-filters{display:flex;gap:8px;flex-wrap:wrap;padding-top:8px;}
+.ca-filter-btn{font-family:var(--font-mono);font-size:0.65rem;letter-spacing:2px;padding:6px 14px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-secondary);cursor:pointer;transition:all .2s;}
+.ca-filter-btn.active,.ca-filter-btn:hover{border-color:var(--ca-orange);color:var(--ca-orange);background:rgba(255,159,67,.08);}
+.ca-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px;}
+.ca-card{background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:24px;cursor:pointer;transition:all .25s;position:relative;overflow:hidden;}
+.ca-card::before{content:'';position:absolute;top:0;left:0;width:100%;height:2px;background:linear-gradient(90deg,transparent,var(--ca-orange),transparent);opacity:0;transition:opacity .3s;}
+.ca-card:hover{border-color:rgba(255,159,67,.4);transform:translateY(-3px);box-shadow:0 8px 32px rgba(255,159,67,.1);}
+.ca-card:hover::before{opacity:1;}
+.ca-card-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.ca-diff{font-family:var(--font-mono);font-size:0.6rem;letter-spacing:2px;padding:4px 10px;border-radius:6px;text-transform:uppercase;}
+.ca-diff.easy{color:var(--neon-green);background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.3);}
+.ca-diff.medium{color:var(--ca-orange);background:rgba(255,159,67,.1);border:1px solid rgba(255,159,67,.3);}
+.ca-diff.hard{color:#ff4757;background:rgba(255,71,87,.1);border:1px solid rgba(255,71,87,.3);}
+.ca-marks{font-family:var(--font-mono);font-size:0.7rem;color:var(--neon-blue);}
+.ca-card-title{font-size:1.05rem;font-weight:700;color:var(--text-primary);margin-bottom:8px;}
+.ca-card-langs{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
+.ca-lang-tag{font-family:var(--font-mono);font-size:0.58rem;letter-spacing:1px;padding:2px 8px;border-radius:4px;border:1px solid var(--border);color:var(--text-muted);}
+/* Solve View */
+#ca-solve-view{min-height:100vh;padding:90px 0 0;flex-direction:column;}
+.ca-solve-topbar{display:flex;align-items:center;gap:12px;padding:12px 20px;background:var(--bg-card);border-bottom:1px solid var(--border);flex-wrap:wrap;}
+.ca-back-btn{font-family:var(--font-mono);font-size:0.65rem;letter-spacing:1px;padding:6px 14px;border-radius:8px;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--text-secondary);transition:all .2s;}
+.ca-back-btn:hover{border-color:var(--ca-orange);color:var(--ca-orange);}
+.ca-solve-body{display:grid;grid-template-columns:1fr 1fr;flex:1;height:calc(100vh - 142px);}
+@media(max-width:860px){.ca-solve-body{grid-template-columns:1fr;height:auto;}}
+.ca-problem-panel{padding:24px;overflow-y:auto;border-right:1px solid var(--border);}
+.ca-sec-label{font-family:var(--font-mono);font-size:0.6rem;letter-spacing:3px;color:var(--ca-orange);margin:14px 0 6px;text-transform:uppercase;}
+.ca-prob-text{font-size:0.9rem;color:var(--text-secondary);line-height:1.7;white-space:pre-wrap;}
+.ca-io-block{background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:8px;padding:12px 16px;font-family:var(--font-mono);font-size:0.8rem;color:var(--neon-green);white-space:pre-wrap;margin-bottom:8px;}
+.ca-editor-panel{display:flex;flex-direction:column;}
+.ca-editor-topbar{display:flex;align-items:center;gap:10px;padding:10px 14px;background:rgba(0,0,0,.2);border-bottom:1px solid var(--border);}
+.ca-lang-sel{font-family:var(--font-mono);font-size:0.75rem;padding:6px 12px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;color:var(--text-primary);outline:none;cursor:pointer;}
+.ca-btn-run{padding:8px 18px;border-radius:8px;border:1px solid rgba(0,212,255,.4);background:rgba(0,212,255,.08);color:var(--neon-blue);font-family:var(--font-mono);font-size:0.7rem;letter-spacing:1px;cursor:pointer;transition:all .2s;}
+.ca-btn-run:hover{background:rgba(0,212,255,.18);}
+.ca-btn-run:disabled,.ca-btn-submit:disabled{opacity:.5;cursor:not-allowed;}
+.ca-btn-submit{padding:8px 18px;border-radius:8px;border:none;background:var(--ca-orange);color:#0a0a0f;font-family:var(--font-mono);font-size:0.7rem;letter-spacing:1px;font-weight:900;cursor:pointer;transition:all .2s;}
+.ca-btn-submit:hover{opacity:.85;}
+#monaco-container{flex:1;min-height:360px;}
+.ca-output-panel{border-top:1px solid var(--border);padding:12px 16px;max-height:190px;overflow-y:auto;background:rgba(0,0,0,.25);}
+.ca-output-label{font-family:var(--font-mono);font-size:0.6rem;letter-spacing:2px;color:var(--text-muted);margin-bottom:8px;}
+.ca-verdict{font-family:var(--font-mono);font-size:0.72rem;padding:6px 12px;border-radius:6px;margin-bottom:4px;}
+.ca-verdict.ac{background:rgba(0,255,136,.08);color:var(--neon-green);border:1px solid rgba(0,255,136,.25);}
+.ca-verdict.wa{background:rgba(255,71,87,.08);color:#ff4757;border:1px solid rgba(255,71,87,.25);}
+.ca-verdict.re{background:rgba(255,159,67,.08);color:var(--ca-orange);border:1px solid rgba(255,159,67,.25);}
+.ca-violation-bar{display:none;position:fixed;top:90px;left:50%;transform:translateX(-50%);z-index:9999;background:rgba(255,71,87,.12);border:1px solid rgba(255,71,87,.5);border-radius:10px;padding:8px 24px;font-family:var(--font-mono);font-size:0.72rem;letter-spacing:2px;color:#ff4757;}
+#ca-auth-overlay{position:fixed;inset:0;z-index:9998;background:rgba(10,10,15,.95);backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center;}
+.ca-auth-card{background:var(--bg-card);border:1px solid rgba(0,212,255,.3);border-radius:20px;padding:36px;max-width:420px;width:90%;position:relative;}
+.ca-auth-card::before{content:'';position:absolute;top:0;left:0;width:100%;height:2px;background:linear-gradient(90deg,transparent,var(--neon-blue),transparent);border-radius:20px 20px 0 0;}
+.ca-auth-input{width:100%;padding:12px 16px;margin-top:6px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:10px;color:var(--text-primary);outline:none;font-family:var(--font-mono);box-sizing:border-box;}
+.ca-auth-input:focus{border-color:var(--neon-blue);}
+.ca-auth-label{font-family:var(--font-mono);font-size:0.62rem;letter-spacing:2px;color:var(--text-muted);}
+</style>
+</head>
+<body>
+<canvas id="bg-canvas"></canvas>
+
+<!-- NAVBAR -->
+<nav class="navbar" id="navbar">
+  <a href="index.html" class="nav-brand">
+    <img src="assets/logo.png" alt="CSSC Logo" class="nav-logo" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';"/>
+    <div class="nav-logo-placeholder" style="display:none;">CSSC</div>
+    <div><div class="nav-title">CSSC</div><div class="nav-subtitle">CYBER SECURITY STUDENT CLUB</div></div>
+  </a>
+  <ul class="nav-links" id="nav-links">
+    <li><a href="index.html">Home</a></li>
+    <li><a href="about.html">About</a></li>
+    <li><a href="ethics.html">Cyber Ethics</a></li>
+    <li><a href="quiz.html">Quiz Arena</a></li>
+    <li><a href="coding.html" class="active" style="color:var(--ca-orange);">🖥️ Coding Arena</a></li>
+    <li><a href="team.html">Team</a></li>
+    <li><a href="admin.html" style="color:var(--neon-blue);font-family:var(--font-mono);font-size:0.75rem;letter-spacing:1px;">⚙ ADMIN</a></li>
+    <li><a href="register.html" class="nav-cta">Join Club</a></li>
+  </ul>
+  <button class="hamburger" id="hamburger" aria-label="Toggle menu"><span></span><span></span><span></span></button>
+</nav>
+<nav class="mobile-nav" id="mobile-nav">
+  <a href="index.html">🏠 Home</a><a href="about.html">👨‍💻 About CSSC</a>
+  <a href="ethics.html">⚖️ Cyber Ethics</a><a href="quiz.html">🧪 Quiz Arena</a>
+  <a href="coding.html">🖥️ Coding Arena</a><a href="team.html">👥 Team</a>
+  <a href="admin.html">⚙️ Admin Panel</a><a href="register.html">📝 Join Club</a>
+</nav>
+
+<!-- AUTH OVERLAY -->
+<div id="ca-auth-overlay">
+  <div class="ca-auth-card">
+    <div style="font-size:1.8rem;margin-bottom:6px;">🖥️</div>
+    <h2 style="color:var(--neon-blue);font-size:1.3rem;margin-bottom:4px;">Coding Arena Access</h2>
+    <div style="font-family:var(--font-mono);font-size:0.62rem;letter-spacing:2px;color:var(--text-muted);margin-bottom:20px;">// AUTHENTICATE_TO_CONTINUE</div>
+    <form id="ca-auth-form">
+      <div id="ca-reg-fields" style="display:none;flex-direction:column;gap:12px;margin-bottom:12px;">
+        <div><label class="ca-auth-label">YOUR NAME</label><input class="ca-auth-input" type="text" id="ca-name" placeholder="Full Name"/></div>
+        <div><label class="ca-auth-label">DEPARTMENT</label>
+          <select id="ca-dept" class="ca-auth-input" style="cursor:pointer;">
+            <option value="CSE">CSE</option><option value="IT">IT</option><option value="ECE">ECE</option>
+            <option value="Cyber">Cyber Security</option><option value="Other">Other</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div><label class="ca-auth-label">EMAIL</label><input class="ca-auth-input" type="email" id="ca-email" required placeholder="student@example.com"/></div>
+        <div><label class="ca-auth-label">PASSWORD</label><input class="ca-auth-input" type="password" id="ca-pass" required placeholder="••••••••"/></div>
+      </div>
+      <div id="ca-auth-msg" style="display:none;margin-top:12px;font-family:var(--font-mono);font-size:0.72rem;padding:8px 12px;border-radius:8px;"></div>
+      <button type="submit" id="ca-auth-btn" style="width:100%;margin-top:18px;padding:14px;border-radius:12px;border:none;background:var(--neon-blue);color:#0a0a0f;font-weight:900;font-size:0.9rem;letter-spacing:1px;cursor:pointer;">⚡ VERIFY IDENTITY</button>
+      <button type="button" id="ca-auth-toggle" style="width:100%;margin-top:10px;background:transparent;border:none;color:var(--text-muted);font-family:var(--font-mono);font-size:0.65rem;letter-spacing:1px;cursor:pointer;">NEW STUDENT? REGISTER HERE</button>
+    </form>
+  </div>
+</div>
+
+<!-- VIOLATION BANNER -->
+<div class="ca-violation-bar" id="ca-violation-bar">⚠ SECURITY VIOLATION — <span id="ca-viol-count">0</span>/3 — Submission locked after 3</div>
+
+<!-- PROBLEM LIST -->
+<div id="ca-problem-list">
+  <div class="ca-hero">
+    <div class="ca-wrap">
+      <div class="ca-header">
+        <div>
+          <div style="font-family:var(--font-mono);font-size:0.65rem;letter-spacing:3px;color:var(--ca-orange);margin-bottom:8px;">// CODING_ARENA_SYSTEM_ACTIVE</div>
+          <h1 class="ca-title">CSSC <span>Coding</span><br/>Arena</h1>
+          <p style="color:var(--text-secondary);margin-top:10px;max-width:480px;font-size:0.95rem;line-height:1.7;">Solve cybersecurity-themed coding challenges. Write, run and submit code in multiple languages. Scores are synced to Firebase live.</p>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;">
+            <span class="lobby-badge green">🛡 Anti-Cheat Active</span>
+            <span class="lobby-badge blue">⏱ Per-Problem Timer</span>
+            <span class="lobby-badge" style="border-color:rgba(255,159,67,.4);color:var(--ca-orange);">💾 Monaco Editor</span>
+            <span class="lobby-badge">📊 Firebase Scored</span>
+            <span class="lobby-badge" style="border-color:rgba(255,71,87,.4);color:#ff4757;">🔒 5-Min Cooldown</span>
+          </div>
+        </div>
+        <div class="ca-filters">
+          <button class="ca-filter-btn active" data-diff="">All</button>
+          <button class="ca-filter-btn" data-diff="easy">Easy</button>
+          <button class="ca-filter-btn" data-diff="medium">Medium</button>
+          <button class="ca-filter-btn" data-diff="hard">Hard</button>
+        </div>
+      </div>
+      <div id="ca-problems-grid" class="ca-grid">
+        <div style="grid-column:1/-1;text-align:center;padding:60px;color:var(--text-muted);">
+          <div style="font-size:2rem;margin-bottom:12px;">🔥</div>
+          <div style="font-family:var(--font-mono);font-size:0.75rem;letter-spacing:2px;">CONNECTING TO FIREBASE...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SOLVE VIEW -->
+<div id="ca-solve-view">
+  <div class="ca-solve-topbar">
+    <button class="ca-back-btn" id="ca-back-btn">← Back</button>
+    <div style="font-family:var(--font-mono);font-size:0.78rem;color:var(--text-primary);font-weight:700;flex:1;" id="ca-solve-title">Problem</div>
+    <span id="ca-solve-diff" class="ca-diff easy">Easy</span>
+    <span id="ca-solve-marks" style="font-family:var(--font-mono);font-size:0.7rem;color:var(--neon-blue);"></span>
+    <span style="font-family:var(--font-mono);font-size:0.65rem;color:var(--ca-orange);">⏱ <span id="ca-solve-timer">--:--</span></span>
+    <span id="ca-cooldown-msg" style="display:none;font-family:var(--font-mono);font-size:0.65rem;color:#ff4757;"></span>
+  </div>
+  <div class="ca-solve-body">
+    <div class="ca-problem-panel">
+      <h2 id="ca-prob-title" style="font-size:1.15rem;font-weight:900;color:var(--text-primary);margin-bottom:12px;"></h2>
+      <div class="ca-sec-label">DESCRIPTION</div>
+      <div class="ca-prob-text" id="ca-prob-desc"></div>
+      <div class="ca-sec-label">CONSTRAINTS</div>
+      <div class="ca-prob-text" id="ca-prob-constr"></div>
+      <div class="ca-sec-label">SAMPLE INPUT</div>
+      <div class="ca-io-block" id="ca-prob-input"></div>
+      <div class="ca-sec-label">EXPECTED OUTPUT</div>
+      <div class="ca-io-block" id="ca-prob-output"></div>
+    </div>
+    <div class="ca-editor-panel">
+      <div class="ca-editor-topbar">
+        <select class="ca-lang-sel" id="ca-lang-sel"></select>
+        <button class="ca-btn-run" id="ca-run-btn">▶ RUN</button>
+        <button class="ca-btn-submit" id="ca-submit-btn">🚀 SUBMIT</button>
+      </div>
+      <div id="monaco-container"></div>
+      <div class="ca-output-panel">
+        <div class="ca-output-label">// OUTPUT_STREAM</div>
+        <div id="ca-output-list"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="script.js"></script>
+<script>
+/* ============================================================
+   CSSC CODING ARENA — Main Script
+   ============================================================ */
+(function(){
+  'use strict';
+  const LOGIN_KEY='cssc_student_token', USER_KEY='cssc_student_user';
+  const PISTON='https://emkc.org/api/v2/piston/execute';
+  const CD_MS=5*60*1000, MAX_VIOL=3;
+  const STARTERS={
+    python:'# Python solution\nimport sys\ninput=sys.stdin.readline\n\n',
+    'c++':'#include<bits/stdc++.h>\nusing namespace std;\nint main(){\n    \n    return 0;\n}\n',
+    java:'import java.util.*;\npublic class Main{\n    public static void main(String[] args){\n        Scanner sc=new Scanner(System.in);\n        \n    }\n}\n',
+    javascript:'process.stdin.resume();\nprocess.stdin.setEncoding("utf8");\nlet input="";\nprocess.stdin.on("data",d=>input+=d);\nprocess.stdin.on("end",()=>{\n    const lines=input.trim().split("\\n");\n    // your code\n});\n',
+    c:'#include<stdio.h>\nint main(){\n    \n    return 0;\n}\n'
+  };
+
+  let currentUser=null, currentProblem=null, monacoEditor=null, violations=0, solveTimer=null, timeLeft=0;
+  const $=id=>document.getElementById(id);
+
+  // Auth
+  if(sessionStorage.getItem(LOGIN_KEY)){
+    currentUser=JSON.parse(sessionStorage.getItem(USER_KEY)||'null');
+    $('ca-auth-overlay').style.display='none';
+  }
+
+  let isReg=false;
+  $('ca-auth-toggle').addEventListener('click',()=>{
+    isReg=!isReg;
+    $('ca-reg-fields').style.display=isReg?'flex':'none';
+    $('ca-auth-btn').textContent=isReg?'🚀 CREATE ACCOUNT':'⚡ VERIFY IDENTITY';
+    $('ca-auth-toggle').textContent=isReg?'ALREADY REGISTERED? LOGIN':'NEW STUDENT? REGISTER HERE';
+    $('ca-auth-msg').style.display='none';
+  });
+
+  $('ca-auth-form').addEventListener('submit',async(e)=>{
+    e.preventDefault();
+    const email=$('ca-email').value.trim(), pass=$('ca-pass').value;
+    $('ca-auth-btn').disabled=true; $('ca-auth-btn').textContent='⌛ PROCESSING...';
+    $('ca-auth-msg').style.display='none';
+    try{
+      const fbAuth=window.__csscAuth;
+      if(!fbAuth) throw new Error('Auth not ready. Refresh page.');
+      if(isReg){
+        const name=$('ca-name').value.trim(), dept=$('ca-dept').value;
+        const cred=await window.__createUserWithEmailAndPassword(fbAuth,email,pass);
+        await window.__updateProfile(cred.user,{displayName:name});
+        const db=window.__csscDb;
+        if(db) await window.__setDoc(window.__doc(db,'users',cred.user.uid),{name,email,department:dept,registeredAt:new Date().toISOString()});
+        isReg=false; $('ca-reg-fields').style.display='none';
+        $('ca-auth-btn').textContent='⚡ VERIFY IDENTITY';
+        $('ca-auth-toggle').textContent='NEW STUDENT? REGISTER HERE';
+        showMsg('✅ Registered! Please login.',true);
+      } else {
+        const cred=await window.__signInWithEmailAndPassword(fbAuth,email,pass);
+        let dept='General';
+        try{const s=await window.__getDoc(window.__doc(window.__csscDb,'users',cred.user.uid));if(s.exists())dept=s.data().department||'General';}catch(x){}
+        currentUser={id:cred.user.uid,name:cred.user.displayName||email.split('@')[0],email:cred.user.email,department:dept};
+        sessionStorage.setItem(LOGIN_KEY,cred.user.uid);
+        sessionStorage.setItem(USER_KEY,JSON.stringify(currentUser));
+        $('ca-auth-overlay').style.display='none';
+        renderProblems();
+      }
+    }catch(err){
+      const m={'auth/email-already-in-use':'Email already registered.','auth/invalid-credential':'Invalid email or password.','auth/weak-password':'Password ≥6 chars.','auth/user-not-found':'No account with this email.','auth/wrong-password':'Wrong password.'};
+      showMsg(m[err.code]||err.message,false);
+    }
+    $('ca-auth-btn').disabled=false;
+    if(!isReg) $('ca-auth-btn').textContent='⚡ VERIFY IDENTITY';
+  });
+
+  function showMsg(t,ok){
+    const el=$('ca-auth-msg');
+    el.textContent=t; el.style.color=ok?'#00ff88':'#ff4757';
+    el.style.background=ok?'rgba(0,255,136,.07)':'rgba(255,71,87,.07)';
+    el.style.border=ok?'1px solid rgba(0,255,136,.3)':'1px solid rgba(255,71,87,.3)';
+    el.style.display='block';
+  }
+
+  // Problem list rendering
+  function renderProblems(diff){
+    const grid=$('ca-problems-grid');
+    const all=window.__caProblems||[];
+    const list=diff?all.filter(p=>p.difficulty===diff):all;
+    if(!list.length){
+      grid.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:60px;color:var(--text-muted);"><div style="font-size:2rem;margin-bottom:12px;">📁</div><div style="font-family:var(--font-mono);font-size:0.75rem;letter-spacing:2px;">NO PROBLEMS YET</div><div style="font-size:0.85rem;margin-top:8px;">Admin can add problems via the Admin Panel → 🖥️ Coding Arena tab.</div></div>';
+      return;
+    }
+    grid.innerHTML=list.map(p=>`
+      <div class="ca-card" onclick="window.__openProb('${p.id}')">
+        <div class="ca-card-top">
+          <span class="ca-diff ${p.difficulty}">${p.difficulty[0].toUpperCase()+p.difficulty.slice(1)}</span>
+          <span class="ca-marks">${p.marks} pts</span>
+        </div>
+        <div class="ca-card-title">${p.title}</div>
+        <div class="ca-card-langs">${(p.allowedLanguages||[]).map(l=>`<span class="ca-lang-tag">${l}</span>`).join('')}</div>
+      </div>`).join('');
+  }
+
+  document.querySelectorAll('.ca-filter-btn').forEach(btn=>{
+    btn.addEventListener('click',function(){
+      document.querySelectorAll('.ca-filter-btn').forEach(b=>b.classList.remove('active'));
+      this.classList.add('active');
+      renderProblems(this.dataset.diff||'');
+    });
+  });
+
+  // Open problem
+  window.__openProb=function(id){
+    if(!currentUser){$('ca-auth-overlay').style.display='flex';return;}
+    const p=(window.__caProblems||[]).find(x=>x.id===id);
+    if(!p) return;
+    currentProblem=p; violations=0;
+    $('ca-solve-title').textContent=p.title;
+    $('ca-prob-title').textContent=p.title;
+    $('ca-solve-diff').textContent=p.difficulty[0].toUpperCase()+p.difficulty.slice(1);
+    $('ca-solve-diff').className='ca-diff '+p.difficulty;
+    $('ca-solve-marks').textContent=p.marks+' pts';
+    $('ca-prob-desc').textContent=p.description||'—';
+    $('ca-prob-constr').textContent=p.constraints||'None.';
+    $('ca-prob-input').textContent=p.sampleInput||'—';
+    $('ca-prob-output').textContent=p.sampleOutput||'—';
+    $('ca-output-list').innerHTML='';
+    $('ca-cooldown-msg').style.display='none';
+    $('ca-submit-btn').disabled=false;
+    $('ca-violation-bar').style.display='none';
+
+    const langSel=$('ca-lang-sel');
+    langSel.innerHTML=(p.allowedLanguages||['python']).map(l=>`<option value="${l}">${l}</option>`).join('');
+    $('ca-problem-list').style.display='none';
+    $('ca-solve-view').style.display='flex';
+    window.scrollTo(0,0);
+
+    initMonaco(langSel.value);
+    langSel.onchange=()=>{if(monacoEditor)monacoEditor.setValue(STARTERS[langSel.value]||'');};
+
+    timeLeft=p.timeLimitSeconds||1800;
+    clearInterval(solveTimer); updateTimer();
+    solveTimer=setInterval(()=>{timeLeft--;updateTimer();if(timeLeft<=0){clearInterval(solveTimer);runSample();}},1000);
+    startAntiCheat(); checkCooldown();
+  };
+
+  $('ca-back-btn').addEventListener('click',()=>{
+    $('ca-problem-list').style.display='block';
+    $('ca-solve-view').style.display='none';
+    clearInterval(solveTimer); stopAntiCheat();
+    currentProblem=null;
+    if(monacoEditor){monacoEditor.dispose();monacoEditor=null;}
+  });
+
+  function updateTimer(){
+    const m=Math.floor(timeLeft/60),s=timeLeft%60;
+    $('ca-solve-timer').textContent=`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    $('ca-solve-timer').style.color=timeLeft<=60?'#ff4757':'var(--ca-orange)';
+  }
+
+  function initMonaco(lang){
+    const ml=lang==='c++'?'cpp':lang;
+    const container=$('monaco-container');
+    if(monacoEditor){monacoEditor.dispose();monacoEditor=null;}
+    const create=()=>{
+      monacoEditor=window.monaco.editor.create(container,{
+        value:STARTERS[lang]||'',language:ml,theme:'vs-dark',
+        fontSize:14,minimap:{enabled:false},scrollBeyondLastLine:false,automaticLayout:true
+      });
+    };
+    if(window.monaco){create();}
+    else{require.config({paths:{vs:'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs'}});require(['vs/editor/editor.main'],create);}
+  }
+
+  async function runCode(code,lang,stdin){
+    const r=await fetch(PISTON,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({language:lang,version:'*',files:[{content:code}],stdin})});
+    const d=await r.json();
+    return{stdout:(d.run?.stdout||'').trim(),stderr:(d.run?.stderr||'').trim()};
+  }
+
+  async function runSample(){
+    if(!currentProblem||!monacoEditor) return;
+    const code=monacoEditor.getValue(), lang=$('ca-lang-sel').value;
+    setOutput([{c:'',t:'⌛ Running sample test...'}]);
+    try{
+      const r=await runCode(code,lang,currentProblem.sampleInput||'');
+      if(r.stderr) setOutput([{c:'re',t:'⚠ Runtime Error: '+r.stderr.substring(0,200)}]);
+      else{
+        const ok=r.stdout.trim()===(currentProblem.sampleOutput||'').trim();
+        setOutput([
+          {c:ok?'ac':'wa',t:ok?'✅ Sample: Accepted':'❌ Sample: Wrong Answer'},
+          {c:'',t:`Expected: ${(currentProblem.sampleOutput||'').substring(0,80)}`},
+          {c:'',t:`Got:      ${r.stdout.substring(0,80)}`}
+        ]);
+      }
+    }catch(e){setOutput([{c:'re',t:'⚠ Network error: '+e.message}]);}
+  }
+
+  $('ca-run-btn').addEventListener('click',runSample);
+
+  $('ca-submit-btn').addEventListener('click',async()=>{
+    if(!currentUser||!currentProblem||!monacoEditor) return;
+    const cdKey='ca_cd_'+currentProblem.id;
+    const last=parseInt(localStorage.getItem(cdKey)||'0');
+    const rem=CD_MS-(Date.now()-last);
+    if(rem>0&&last>0){const m=Math.floor(rem/60000),s=Math.floor((rem%60000)/1000);setOutput([{c:'wa',t:`🔒 Cooldown: retry in ${m}:${String(s).padStart(2,'0')}`}]);return;}
+    const code=monacoEditor.getValue(), lang=$('ca-lang-sel').value;
+    const tests=currentProblem.hiddenTestCases||[{input:currentProblem.sampleInput||'',expectedOutput:currentProblem.sampleOutput||''}];
+    $('ca-submit-btn').disabled=true; $('ca-submit-btn').textContent='⌛ JUDGING...';
+    setOutput([{c:'',t:'⌛ Running all test cases...'}]);
+    let passed=0; const rows=[];
+    for(let i=0;i<tests.length;i++){
+      try{
+        const r=await runCode(code,lang,tests[i].input||'');
+        const ok=r.stdout.trim()===(tests[i].expectedOutput||'').trim();
+        if(ok) passed++;
+        rows.push({c:r.stderr?'re':ok?'ac':'wa',t:r.stderr?`⚠ TC${i+1}: Runtime Error`:ok?`✅ TC${i+1}: Accepted`:`❌ TC${i+1}: Wrong Answer`});
+      }catch(e){rows.push({c:'re',t:`⚠ TC${i+1}: Network Error`});}
+    }
+    const allAC=passed===tests.length;
+    const verdict=allAC?'Accepted':passed>0?'Partial':'Wrong Answer';
+    const score=allAC?currentProblem.marks:Math.round((passed/tests.length)*currentProblem.marks*0.5);
+    rows.unshift({c:allAC?'ac':'wa',t:`${allAC?'✅':'❌'} ${verdict} — ${passed}/${tests.length} passed — Score: ${score}/${currentProblem.marks}`});
+    setOutput(rows);
+    localStorage.setItem(cdKey,Date.now().toString()); checkCooldown();
+    try{
+      const db=window.__csscDb;
+      if(db&&currentUser){
+        await window.__addDoc(window.__collection(db,'codingSubmissions'),{
+          studentName:currentUser.name, email:currentUser.email, department:currentUser.department,
+          problemId:currentProblem.id, problemTitle:currentProblem.title,
+          language:lang, code, verdict, score,
+          testCasesPassed:passed, totalTestCases:tests.length,
+          submittedAt:window.__serverTimestamp()
+        });
+      }
+    }catch(e){console.error('Firestore save:',e);}
+    $('ca-submit-btn').disabled=false; $('ca-submit-btn').textContent='🚀 SUBMIT';
+  });
+
+  function setOutput(rows){
+    $('ca-output-list').innerHTML=rows.map(r=>`<div class="ca-verdict ${r.c||''}">${r.t}</div>`).join('');
+  }
+
+  function checkCooldown(){
+    if(!currentProblem) return;
+    const cdKey='ca_cd_'+currentProblem.id;
+    const last=parseInt(localStorage.getItem(cdKey)||'0');
+    const rem=CD_MS-(Date.now()-last);
+    const el=$('ca-cooldown-msg');
+    if(rem>0&&last>0){
+      const m=Math.floor(rem/60000),s=Math.floor((rem%60000)/1000);
+      el.style.display='block'; el.textContent=`🔒 Next submit: ${m}:${String(s).padStart(2,'0')}`;
+      setTimeout(checkCooldown,1000);
+    } else el.style.display='none';
+  }
+
+  function onViolation(){
+    if(!currentProblem) return;
+    violations++;
+    $('ca-violation-bar').style.display='block';
+    $('ca-viol-count').textContent=violations;
+    if(violations>=MAX_VIOL){$('ca-submit-btn').disabled=true;setOutput([{c:'wa',t:'🔒 Submission locked — max violations reached.'}]);}
+  }
+  function startAntiCheat(){document.addEventListener('visibilitychange',onViolation);window.addEventListener('blur',onViolation);}
+  function stopAntiCheat(){document.removeEventListener('visibilitychange',onViolation);window.removeEventListener('blur',onViolation);violations=0;}
+
+  // Expose renderProblems for Firestore callback
+  window.__renderProblems=renderProblems;
+  if(currentUser) renderProblems();
+})();
+</script>
+
+<!-- Monaco Loader -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
+
+<!-- Firebase ES Module -->
+<script type="module">
+import { initializeApp }    from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getFirestore, collection, addDoc, serverTimestamp, doc, setDoc, getDoc, query, where, orderBy, onSnapshot }
+                            from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile }
+                            from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+
+const firebaseConfig={
+  apiKey:'AIzaSyBDzUCgdQ2go81-Z7t-Ky7_wNBQryAUC7Q',
+  authDomain:'cssc-quizes-system.firebaseapp.com',
+  projectId:'cssc-quizes-system',
+  storageBucket:'cssc-quizes-system.firebasestorage.app',
+  messagingSenderId:'499593375023',
+  appId:'1:499593375023:web:836a3ea31fe9a1c29105da'
+};
+const app=initializeApp(firebaseConfig);
+const db=getFirestore(app);
+const auth=getAuth(app);
+window.__csscDb=db; window.__csscAuth=auth;
+window.__addDoc=addDoc; window.__collection=collection;
+window.__serverTimestamp=serverTimestamp; window.__doc=doc;
+window.__setDoc=setDoc; window.__getDoc=getDoc;
+window.__createUserWithEmailAndPassword=createUserWithEmailAndPassword;
+window.__signInWithEmailAndPassword=signInWithEmailAndPassword;
+window.__updateProfile=updateProfile;
+
+// Live-load active problems
+const q=query(collection(db,'codingProblems'),orderBy('createdAt','desc'));
+onSnapshot(q,snap=>{
+  window.__caProblems=[];
+  snap.forEach(d=>{
+    const pData=d.data();
+    if(pData.status==='active') window.__caProblems.push({id:d.id,...pData});
+  });
+  const activeFilter=document.querySelector('.ca-filter-btn.active')?.dataset?.diff||'';
+  if(window.__renderProblems) window.__renderProblems(activeFilter);
+},err=>console.error('codingProblems snapshot error:',err));
+console.log('🔥 Firebase ready — Coding Arena');
+</script>
+</body>
+</html>

@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CSSC Admin Panel – Command Center</title>
     <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <link rel="icon" href="assets/logo.png" type="image/png" />
     <style>
         /* ===========================
@@ -278,7 +279,8 @@
             background: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: 16px;
-            overflow: hidden;
+            overflow-x: auto;
+            overflow-y: hidden;
         }
         .members-table { width: 100%; border-collapse: collapse; }
         .members-table thead tr { background: rgba(255,255,255,0.03); border-bottom: 1px solid var(--border); }
@@ -545,6 +547,7 @@
         <ul class="nav-links">
             <li><a href="index.html">Home</a></li>
             <li><a href="quiz.html">Quiz Arena</a></li>
+            <li><a href="coding.html" style="color:#ff9f43;">🖥️ Coding Arena</a></li>
             <li><a href="team.html">Team</a></li>
             <li><a href="admin.html" class="active" style="color:var(--neon-blue);font-family:var(--font-mono);font-size:0.75rem;letter-spacing:1px;">⚙ ADMIN</a></li>
             <li><a href="register.html" class="nav-cta">Join Club</a></li>
@@ -554,6 +557,7 @@
     <nav class="mobile-nav" id="mobile-nav">
         <a href="index.html">🏠 Home</a>
         <a href="quiz.html">🧪 Quiz Arena</a>
+        <a href="coding.html">🖥️ Coding Arena</a>
         <a href="team.html">👥 Team</a>
         <a href="admin.html">⚙️ Admin Panel</a>
         <a href="register.html">📝 Join Club</a>
@@ -601,6 +605,9 @@
                     <div class="sidebar-section-label">// Operations</div>
                     <a href="#" class="active" data-section="overview"><span class="nav-icon">📊</span> Overview</a>
                     <a href="#" data-section="quiz-mgmt"><span class="nav-icon">🧩</span> Manage Quizzes</a>
+                    <!-- CODING ARENA ADDITION START -->
+                    <a href="#" data-section="coding-arena"><span class="nav-icon">🖥️</span> Coding Arena</a>
+                    <!-- CODING ARENA ADDITION END -->
                     <a href="#" data-section="members"><span class="nav-icon">👥</span> Members</a>
                     <a href="#" data-section="quiz"><span class="nav-icon">🧪</span> Quiz Results</a>
 
@@ -651,11 +658,11 @@
                             <div class="stat-card-label">Violations Today</div>
                             <div class="stat-card-sub">Auto-submitted sessions</div>
                         </div>
-                        <div class="stat-card">
-                            <div class="stat-card-icon">📅</div>
-                            <div class="stat-card-val" style="color:var(--neon-green);font-size:1.4rem;">25 MAR</div>
-                            <div class="stat-card-label">Club Launch Date</div>
-                            <div class="stat-card-sub" id="days-to-launch">Calculating...</div>
+                        <div class="stat-card" id="quiz-schedule-stat-card" style="border-color:rgba(0,212,255,0.25);cursor:pointer;" onclick="document.querySelectorAll('.sidebar-nav a[data-section]').forEach(a=>a.classList.remove('active')); document.querySelector('.sidebar-nav a[data-section=quiz-mgmt]').classList.add('active'); document.querySelectorAll('#section-overview,#section-members,#section-quiz,#section-quiz-mgmt').forEach(s=>s.style.display='none'); document.getElementById('section-quiz-mgmt').style.display='block'; document.getElementById('section-heading').textContent='Quiz Creation Engine'; document.querySelectorAll('.builder-tab').forEach(t=>t.classList.remove('active')); document.querySelector('[data-b-tab=access]').classList.add('active'); document.querySelectorAll('.builder-section').forEach(s=>s.classList.remove('active')); document.getElementById('b-tab-access').classList.add('active');">
+                            <div class="stat-card-icon">⏰</div>
+                            <div class="stat-card-val" style="color:var(--neon-blue);font-size:1.1rem;" id="stat-quiz-schedule-time">NOT SET</div>
+                            <div class="stat-card-label">Quiz Start Time</div>
+                            <div class="stat-card-sub" id="stat-quiz-schedule-sub">Click to configure</div>
                         </div>
                     </div>
 
@@ -783,10 +790,31 @@
                                 <div class="builder-section" id="b-tab-questions">
                                     <h3 style="margin-bottom:24px; color:var(--neon-blue);">❓ Question Management</h3>
                                     
-                                    <div class="upload-area" id="csv-upload-zone" style="margin-bottom:32px;">
-                                        <div class="upload-icon">☁️</div>
-                                        <div class="upload-title">Bulk JSON/CSV Upload</div>
-                                        <div style="font-size:0.85rem; color:var(--text-muted); font-family:var(--font-mono);">Drag and drop question bank file here</div>
+                                    <div class="upload-area" id="csv-upload-zone" style="margin-bottom:32px; border:2px dashed var(--neon-blue); padding:40px 20px; text-align:center; cursor:pointer;" onclick="document.getElementById('file-input-hidden').click()">
+                                        <input type="file" id="file-input-hidden" accept=".xlsx,.xls,.csv,.json" style="display:none" onchange="handleFileSelect(event)" />
+                                        <div class="upload-icon">📁</div>
+                                        <div class="upload-title">Bulk Excel/CSV/JSON Upload</div>
+                                        <div style="font-size:0.85rem; color:var(--text-muted); font-family:var(--font-mono);">Click or Drag and drop question bank file here (Auto-detects rounds)</div>
+                                        <div id="upload-status" style="margin-top:12px;font-size:0.85rem;color:var(--neon-green);display:none;"></div>
+                                    </div>
+                                    
+                                    <!-- ROUND TABS (show after parse) -->
+                                    <div id="round-tabs-bar" style="display:none;margin-bottom:16px;">
+                                        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                                            <span style="color:var(--text-muted);font-size:0.8rem;font-family:var(--font-mono);margin-right:4px;">ROUNDS DETECTED:</span>
+                                            <div id="round-tab-buttons" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
+                                        </div>
+                                    </div>
+
+                                    <!-- PARSED QUESTIONS PREVIEW -->
+                                    <div id="parsed-preview-area" style="display:none;padding:16px;border-radius:12px;border:1px solid rgba(255,255,255,0.05);background:rgba(0,0,0,0.2);margin-bottom:24px;">
+                                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border);">
+                                            <h4 id="preview-heading" style="color:var(--text-primary);font-size:1rem;margin:0;">Parsed Questions</h4>
+                                            <div style="display:flex;gap:8px;">
+                                                <button id="deploy-rounds-btn" class="btn btn-primary" style="font-size:0.8rem;padding:8px 18px;background:var(--neon-green);color:#000;border:none;" onclick="deployRoundsToQuiz()">🚀 Deploy to Virtual DB</button>
+                                            </div>
+                                        </div>
+                                        <div id="questions-preview-list" style="display:flex;flex-direction:column;gap:10px;max-height:400px;overflow-y:auto;padding-right:4px;"></div>
                                     </div>
 
                                     <div class="panel-section-header" style="border-bottom:1px solid var(--border); padding-bottom:12px;">
@@ -915,18 +943,45 @@
 
                                 <!-- ACCESS CONTROL -->
                                 <div class="builder-section" id="b-tab-access">
-                                    <h3 style="margin-bottom:24px; color:var(--neon-blue);">🔐 Quiz Access Control</h3>
-                                    <div class="form-grid">
-                                        <div class="form-group">
-                                            <label>Start Window</label>
-                                            <input type="datetime-local" class="builder-input" />
-                                        </div>
-                                        <div class="form-group">
-                                            <label>Close Window</label>
-                                            <input type="datetime-local" class="builder-input" />
+                                    <h3 style="margin-bottom:8px; color:var(--neon-blue);">🔐 Quiz Access Control</h3>
+                                    <p style="font-family:var(--font-mono);font-size:0.65rem;color:var(--text-muted);letter-spacing:1px;margin-bottom:24px;">// Set when students can start the quiz. Leave blank = always open.</p>
+
+                                    <!-- Scheduler Status Card -->
+                                    <div id="scheduler-status-card" style="margin-bottom:24px;padding:16px 20px;border-radius:12px;border:1px solid rgba(0,255,136,0.2);background:rgba(0,255,136,0.04);display:none;">
+                                        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+                                            <div>
+                                                <div style="font-family:var(--font-mono);font-size:0.65rem;letter-spacing:2px;color:var(--neon-green);margin-bottom:4px;">// QUIZ SCHEDULE ACTIVE</div>
+                                                <div id="scheduler-status-text" style="font-size:0.88rem;color:var(--text-secondary);"></div>
+                                            </div>
+                                            <div id="scheduler-live-badge" style="font-family:var(--font-mono);font-size:0.65rem;letter-spacing:2px;padding:4px 12px;border-radius:20px;border:1px solid rgba(0,255,136,0.4);color:var(--neon-green);background:rgba(0,255,136,0.07);">● SCHEDULED</div>
                                         </div>
                                     </div>
-                                    <div class="settings-list" style="margin-top:24px;">
+
+                                    <div class="form-grid">
+                                        <div class="form-group">
+                                            <label>🟢 Quiz Opens At</label>
+                                            <input type="datetime-local" id="quiz-start-time" class="builder-input" />
+                                            <div style="font-family:var(--font-mono);font-size:0.6rem;color:var(--text-muted);margin-top:4px;">Students cannot start before this time.</div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>🔴 Quiz Closes At</label>
+                                            <input type="datetime-local" id="quiz-end-time" class="builder-input" />
+                                            <div style="font-family:var(--font-mono);font-size:0.6rem;color:var(--text-muted);margin-top:4px;">Quiz locks out after this time.</div>
+                                        </div>
+                                    </div>
+
+                                    <div style="display:flex;gap:12px;margin-top:20px;flex-wrap:wrap;">
+                                        <button class="btn-sm primary" onclick="saveQuizSchedule()" style="display:flex;align-items:center;gap:8px;">
+                                            💾 Save Schedule
+                                        </button>
+                                        <button class="btn-sm secondary" onclick="clearQuizSchedule()" style="border-color:rgba(255,71,87,0.3);color:#ff4757;">
+                                            🗑 Clear Schedule
+                                        </button>
+                                    </div>
+
+                                    <div id="schedule-save-msg" style="margin-top:12px;display:none;font-family:var(--font-mono);font-size:0.72rem;letter-spacing:1px;padding:10px 14px;border-radius:8px;"></div>
+
+                                    <div class="settings-list" style="margin-top:28px;">
                                         <div class="setting-item">
                                             <div>
                                                 <div class="setting-info-title">Limit Total Attempts</div>
@@ -1008,6 +1063,84 @@
                     </div>
                 </div>
 
+                <!-- CODING ARENA ADDITION START -->
+                <!-- CODING ARENA SECTION -->
+                <div id="section-coding-arena" style="display:none;">
+
+                  <!-- Sub-tabs -->
+                  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px;">
+                    <button class="ca-admin-tab active" data-ca-tab="problems" onclick="switchCaTab(this)">📋 Problem Manager</button>
+                    <button class="ca-admin-tab" data-ca-tab="submissions" onclick="switchCaTab(this)">📤 Submissions</button>
+                    <button class="ca-admin-tab" data-ca-tab="leaderboard" onclick="switchCaTab(this)">🏆 Leaderboard</button>
+                  </div>
+
+                  <!-- Problem Manager -->
+                  <div id="ca-tab-problems" class="ca-admin-section">
+                    <div class="panel-section-header">
+                      <h2>📋 Problem Manager</h2>
+                      <button class="btn-sm primary" onclick="document.getElementById('ca-prob-modal').classList.add('show');">+ Add Problem</button>
+                    </div>
+                    <div class="table-wrap">
+                      <table class="members-table">
+                        <thead><tr>
+                          <th>#</th><th>Title</th><th>Difficulty</th><th>Marks</th><th>Languages</th><th>Status</th><th>Actions</th>
+                        </tr></thead>
+                        <tbody id="ca-problems-tbody">
+                          <tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted);font-family:var(--font-mono);font-size:0.75rem;">🔥 LOADING FROM FIREBASE...</td></tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <!-- Submissions Viewer -->
+                  <div id="ca-tab-submissions" class="ca-admin-section" style="display:none;">
+                    <div class="panel-section-header">
+                      <h2>📤 Code Submissions</h2>
+                      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+                        <select id="ca-filter-verdict" class="builder-select" style="width:140px;">
+                          <option value="">All Verdicts</option>
+                          <option value="Accepted">✅ Accepted</option>
+                          <option value="Partial">⚡ Partial</option>
+                          <option value="Wrong Answer">❌ Wrong Answer</option>
+                        </select>
+                        <select id="ca-filter-dept-sub" class="builder-select" style="width:130px;">
+                          <option value="">All Depts</option>
+                          <option value="CSE">CSE</option><option value="IT">IT</option>
+                          <option value="ECE">ECE</option><option value="Cyber">Cyber</option>
+                        </select>
+                        <button class="btn-sm secondary" onclick="exportCaSubmissionsCSV()">⬇ Export CSV</button>
+                      </div>
+                    </div>
+                    <div class="table-wrap">
+                      <table class="members-table">
+                        <thead><tr>
+                          <th>#</th><th>Student</th><th>Email</th><th>Dept</th><th>Problem</th><th>Lang</th><th>Verdict</th><th>Score</th><th>TCs</th><th>Submitted At</th><th>Code</th>
+                        </tr></thead>
+                        <tbody id="ca-subs-tbody">
+                          <tr><td colspan="11" style="text-align:center;padding:40px;color:var(--text-muted);font-family:var(--font-mono);font-size:0.75rem;">🔥 LOADING FROM FIREBASE...</td></tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <!-- Leaderboard -->
+                  <div id="ca-tab-leaderboard" class="ca-admin-section" style="display:none;">
+                    <div class="panel-section-header"><h2>🏆 Coding Leaderboard</h2></div>
+                    <div class="table-wrap">
+                      <table class="members-table">
+                        <thead><tr>
+                          <th>Rank</th><th>Student</th><th>Dept</th><th>Problems Solved</th><th>Total Score</th>
+                        </tr></thead>
+                        <tbody id="ca-leaderboard-tbody">
+                          <tr><td colspan="5" style="text-align:center;padding:40px;color:var(--text-muted);font-family:var(--font-mono);font-size:0.75rem;">🔥 LOADING...</td></tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                </div>
+                <!-- CODING ARENA ADDITION END -->
+
                 <!-- QUIZ RESULTS SECTION — Powered by Firebase -->
                 <div id="section-quiz" style="display:none;">
 
@@ -1080,11 +1213,12 @@
                                     <th>Violations</th>
                                     <th>Progress</th>
                                     <th>Last Attempt</th>
+                                    <th style="color:#ff9f43;">Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="fb-results-tbody">
                                 <tr>
-                                    <td colspan="11" style="text-align:center;padding:48px;color:var(--text-muted);">
+                                    <td colspan="12" style="text-align:center;padding:48px;color:var(--text-muted);">
                                         <div style="font-size:2rem;margin-bottom:12px;">🔥</div>
                                         <div style="font-family:var(--font-mono);letter-spacing:2px;font-size:0.75rem;">Connecting to Firebase...</div>
                                     </td>
@@ -1097,13 +1231,109 @@
         </div>
     </div>
 
+    <!-- ===== EDIT RESULT MODAL ===== -->
+    <div id="edit-result-modal" style="display:none;position:fixed;inset:0;z-index:20000;background:rgba(10,10,15,0.95);backdrop-filter:blur(10px);align-items:center;justify-content:center;">
+        <div style="background:var(--bg-card);border:1px solid rgba(0,212,255,0.3);border-radius:24px;padding:36px;max-width:500px;width:90%;box-shadow:0 0 60px rgba(0,212,255,0.15);position:relative;">
+            <div style="position:absolute;top:0;left:0;width:100%;height:2px;background:linear-gradient(90deg,transparent,var(--neon-blue),transparent);border-radius:24px 24px 0 0;"></div>
+            <div style="font-size:1.8rem;margin-bottom:6px;">✏️</div>
+            <h3 style="color:var(--neon-blue);margin-bottom:4px;font-size:1.3rem;">Edit Student Result</h3>
+            <div id="edit-modal-student-info" style="font-family:var(--font-mono);font-size:0.65rem;letter-spacing:2px;color:var(--text-muted);margin-bottom:24px;"></div>
+
+            <div style="margin-bottom:16px;">
+                <label style="font-family:var(--font-mono);font-size:0.65rem;letter-spacing:2px;color:var(--neon-blue);text-transform:uppercase;">Round</label>
+                <select id="edit-round-select" style="width:100%;margin-top:8px;padding:12px 16px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:10px;color:white;outline:none;font-family:var(--font-mono);">
+                    <option value="1">Round 1</option>
+                    <option value="2">Round 2</option>
+                    <option value="3">Round 3</option>
+                </select>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+                <div>
+                    <label style="font-family:var(--font-mono);font-size:0.65rem;letter-spacing:2px;color:var(--text-muted);">SCORE (Correct)</label>
+                    <input type="number" id="edit-score" min="0" style="width:100%;margin-top:8px;padding:12px 16px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:10px;color:white;outline:none;font-family:var(--font-mono);" placeholder="e.g. 18" />
+                </div>
+                <div>
+                    <label style="font-family:var(--font-mono);font-size:0.65rem;letter-spacing:2px;color:var(--text-muted);">TOTAL QUESTIONS</label>
+                    <input type="number" id="edit-total" min="1" style="width:100%;margin-top:8px;padding:12px 16px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:10px;color:white;outline:none;font-family:var(--font-mono);" placeholder="e.g. 25" />
+                </div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+                <div>
+                    <label style="font-family:var(--font-mono);font-size:0.65rem;letter-spacing:2px;color:var(--text-muted);">STATUS</label>
+                    <select id="edit-status" style="width:100%;margin-top:8px;padding:12px 16px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:10px;color:white;outline:none;font-family:var(--font-mono);">
+                        <option value="PASSED">PASSED</option>
+                        <option value="FAILED">FAILED</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-family:var(--font-mono);font-size:0.65rem;letter-spacing:2px;color:var(--text-muted);">VIOLATIONS</label>
+                    <input type="number" id="edit-violations" min="0" style="width:100%;margin-top:8px;padding:12px 16px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:10px;color:white;outline:none;font-family:var(--font-mono);" placeholder="0" />
+                </div>
+            </div>
+
+            <div id="edit-modal-msg" style="display:none;margin-bottom:12px;padding:10px 14px;border-radius:8px;font-family:var(--font-mono);font-size:0.72rem;letter-spacing:1px;"></div>
+
+            <div style="display:flex;gap:12px;">
+                <button id="edit-save-btn" onclick="submitEditResult()" style="flex:1;padding:14px;border-radius:12px;border:none;background:var(--neon-blue);color:#0a0a0f;font-weight:900;font-size:0.9rem;letter-spacing:1px;cursor:pointer;transition:all 0.2s;">💾 SAVE &amp; SYNC</button>
+                <button onclick="document.getElementById('edit-result-modal').style.display='none'" style="flex:1;padding:14px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--text-secondary);font-weight:700;font-size:0.9rem;cursor:pointer;">✕ Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CODING ARENA ADDITION START: Add Problem Modal -->
+    <div id="ca-prob-modal" class="modal-overlay">
+      <div class="modal-card" style="max-width:720px;max-height:90vh;overflow-y:auto;">
+        <div class="modal-header"><h2 id="ca-prob-modal-title">➕ Add Problem</h2><button class="modal-close" onclick="document.getElementById('ca-prob-modal').classList.remove('show')">✕</button></div>
+        <div class="form-grid full"><div class="form-group"><label>Problem Title</label><input type="text" id="cap-title" class="builder-input" placeholder="e.g. Two Sum Secure"/></div></div>
+        <div class="form-grid">
+          <div class="form-group"><label>Difficulty</label>
+            <select id="cap-diff" class="builder-select"><option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option></select>
+          </div>
+          <div class="form-group"><label>Marks</label><input type="number" id="cap-marks" class="builder-input" value="10" min="1"/></div>
+          <div class="form-group"><label>Time Limit (seconds)</label><input type="number" id="cap-time" class="builder-input" value="1800" min="60"/></div>
+          <div class="form-group"><label>Status</label>
+            <select id="cap-status" class="builder-select"><option value="active">Active</option><option value="inactive">Inactive</option></select>
+          </div>
+        </div>
+        <div class="form-grid full"><div class="form-group"><label>Description</label><textarea id="cap-desc" class="builder-textarea" rows="4" placeholder="Full problem statement..."></textarea></div></div>
+        <div class="form-grid full"><div class="form-group"><label>Constraints</label><textarea id="cap-constr" class="builder-textarea" rows="2" placeholder="1 ≤ n ≤ 1000"></textarea></div></div>
+        <div class="form-grid">
+          <div class="form-group"><label>Sample Input</label><textarea id="cap-sinput" class="builder-textarea" rows="3" placeholder="5"></textarea></div>
+          <div class="form-group"><label>Sample Output</label><textarea id="cap-soutput" class="builder-textarea" rows="3" placeholder="25"></textarea></div>
+        </div>
+        <div class="form-group" style="margin-bottom:16px;">
+          <label style="font-family:var(--font-mono);font-size:0.7rem;letter-spacing:2px;color:var(--neon-blue);">ALLOWED LANGUAGES</label>
+          <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;">
+            <label style="display:flex;gap:6px;align-items:center;font-size:0.9rem;"><input type="checkbox" name="cap-lang" value="python" checked/> Python</label>
+            <label style="display:flex;gap:6px;align-items:center;font-size:0.9rem;"><input type="checkbox" name="cap-lang" value="c++"/> C++</label>
+            <label style="display:flex;gap:6px;align-items:center;font-size:0.9rem;"><input type="checkbox" name="cap-lang" value="java"/> Java</label>
+            <label style="display:flex;gap:6px;align-items:center;font-size:0.9rem;"><input type="checkbox" name="cap-lang" value="javascript"/> JavaScript</label>
+            <label style="display:flex;gap:6px;align-items:center;font-size:0.9rem;"><input type="checkbox" name="cap-lang" value="c"/> C</label>
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:20px;">
+          <label style="font-family:var(--font-mono);font-size:0.7rem;letter-spacing:2px;color:var(--neon-blue);">HIDDEN TEST CASES</label>
+          <div id="cap-tcs" style="display:flex;flex-direction:column;gap:10px;margin-top:10px;"></div>
+          <button class="btn-sm secondary" onclick="addCaTestCase()" style="margin-top:10px;">+ Add Test Case</button>
+        </div>
+        <div id="cap-modal-msg" style="display:none;margin-bottom:12px;padding:10px;border-radius:8px;font-family:var(--font-mono);font-size:0.72rem;"></div>
+        <div style="display:flex;gap:12px;">
+          <button id="cap-save-btn" onclick="saveCaProblem()" class="btn-sm primary" style="flex:1;padding:14px;">💾 SAVE TO FIREBASE</button>
+          <button onclick="document.getElementById('ca-prob-modal').classList.remove('show')" class="btn-sm secondary" style="flex:1;padding:14px;">✕ Cancel</button>
+        </div>
+      </div>
+    </div>
+    <!-- CODING ARENA ADDITION END: Add Problem Modal -->
+
     <script src="script.js"></script>
     <script>
     /* ============================================================
        CSSC ADMIN PANEL
        ============================================================ */
     (function () {
-        // Hashed credentials (SHA-256) - username: CSSC#2026, password: Cssc#2026
+        // Hashed credentials (SHA-256) — username: CSSC#2026 | password: Cssc#2026
         const ADMIN_HASH_U = 'db3c82b2507f88c9498fd8174a2566cad142c88669e3a4659ec11f09ce0f9ad6';
         const ADMIN_HASH_P = '6e07ee799bbd99af612fe195bfc3d2eabbc81a1af0579cc5fe70d2896e7d25fa';
         
@@ -1113,6 +1343,7 @@
             return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
         }
         const SESSION_KEY = 'cssc_admin_session';
+        const SCHED_KEY   = 'cssc_quiz_schedule';
 
         const loginPage   = document.getElementById('admin-login');
         const dashboard   = document.getElementById('admin-dashboard');
@@ -1178,6 +1409,7 @@
             loadMembers();
             updateDashboardStats();
             updateLaunchCountdown();
+            loadScheduleState();
         }
 
         // ─── Sidebar Navigation ──────────────────────────────────
@@ -1191,13 +1423,17 @@
                     overview: 'Systems Overview',
                     'quiz-mgmt': 'Quiz Creation Engine',
                     members: 'Member Management',
-                    quiz: 'Quiz Session Logs'
+                    quiz: 'Quiz Session Logs',
+                    'coding-arena': 'Coding Arena Management'  /* CODING ARENA ADDITION */
                 }[section] || 'Overview';
 
                 document.getElementById('section-overview').style.display = section === 'overview' ? 'block' : 'none';
                 document.getElementById('section-quiz-mgmt').style.display = section === 'quiz-mgmt' ? 'block' : 'none';
                 document.getElementById('section-members').style.display = section === 'members' ? 'block' : 'none';
                 document.getElementById('section-quiz').style.display = section === 'quiz' ? 'block' : 'none';
+                /* CODING ARENA ADDITION */
+                const caSection = document.getElementById('section-coding-arena');
+                if (caSection) caSection.style.display = section === 'coding-arena' ? 'block' : 'none';
             });
         });
 
@@ -1291,13 +1527,135 @@
             const launchDate = new Date('2026-03-25T00:00:00+05:30');
             const now = new Date();
             const diff = launchDate - now;
-            if (diff > 0) {
-                const days = Math.floor(diff / 86400000);
-                document.getElementById('days-to-launch').textContent = `${days} days remaining`;
-            } else {
-                document.getElementById('days-to-launch').textContent = '🎉 Club Launched!';
+            const el = document.getElementById('days-to-launch');
+            if (el) {
+                if (diff > 0) {
+                    const days = Math.floor(diff / 86400000);
+                    el.textContent = `${days} days remaining`;
+                } else {
+                    el.textContent = '🎉 Club Launched!';
+                }
             }
         }
+
+        // ─── Quiz Schedule ────────────────────────────────────────
+
+        function loadScheduleState() {
+            const saved = JSON.parse(localStorage.getItem(SCHED_KEY) || 'null');
+            const startEl = document.getElementById('quiz-start-time');
+            const endEl   = document.getElementById('quiz-end-time');
+            const statusCard = document.getElementById('scheduler-status-card');
+            const statusText = document.getElementById('scheduler-status-text');
+            const liveBadge  = document.getElementById('scheduler-live-badge');
+            const statTime   = document.getElementById('stat-quiz-schedule-time');
+            const statSub    = document.getElementById('stat-quiz-schedule-sub');
+
+            if (saved && saved.startTime) {
+                // Populate fields
+                if (startEl) startEl.value = saved.startTime;
+                if (endEl && saved.endTime) endEl.value = saved.endTime;
+
+                // Show status card
+                if (statusCard) statusCard.style.display = 'block';
+
+                const startDt = new Date(saved.startTime);
+                const endDt   = saved.endTime ? new Date(saved.endTime) : null;
+                const now     = new Date();
+
+                const fmtDate = dt => dt.toLocaleString('en-IN', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+
+                let statusMsg = `Opens: ${fmtDate(startDt)}`;
+                if (endDt) statusMsg += ` → Closes: ${fmtDate(endDt)}`;
+                if (statusText) statusText.textContent = statusMsg;
+
+                // Dynamic badge
+                if (liveBadge) {
+                    if (now < startDt) {
+                        liveBadge.textContent = '⏳ UPCOMING';
+                        liveBadge.style.borderColor  = 'rgba(255,159,67,0.4)';
+                        liveBadge.style.color        = '#ff9f43';
+                        liveBadge.style.background   = 'rgba(255,159,67,0.07)';
+                    } else if (endDt && now > endDt) {
+                        liveBadge.textContent = '🔴 CLOSED';
+                        liveBadge.style.borderColor  = 'rgba(255,71,87,0.4)';
+                        liveBadge.style.color        = '#ff4757';
+                        liveBadge.style.background   = 'rgba(255,71,87,0.07)';
+                    } else {
+                        liveBadge.textContent = '🟢 LIVE NOW';
+                        liveBadge.style.borderColor  = 'rgba(0,255,136,0.4)';
+                        liveBadge.style.color        = 'var(--neon-green)';
+                        liveBadge.style.background   = 'rgba(0,255,136,0.07)';
+                    }
+                }
+
+                // Overview stat card
+                if (statTime) {
+                    const hhmm = startDt.toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit', hour12:true });
+                    const mmdd = startDt.toLocaleDateString('en-IN', { day:'2-digit', month:'short' });
+                    statTime.textContent = hhmm + ' · ' + mmdd;
+                    statTime.style.fontSize = '0.85rem';
+                }
+                if (statSub) {
+                    const now2 = new Date();
+                    if (now2 < startDt) statSub.textContent = '⏳ Starts in ' + Math.ceil((startDt-now2)/60000) + ' min';
+                    else if (endDt && now2 > endDt)  statSub.textContent = '🔴 Quiz window closed';
+                    else statSub.textContent = '🟢 Quiz is LIVE now';
+                }
+            } else {
+                if (statusCard) statusCard.style.display = 'none';
+                if (statTime) { statTime.textContent = 'NOT SET'; statTime.style.fontSize = '1.1rem'; }
+                if (statSub)  statSub.textContent = 'Click to configure';
+            }
+        }
+
+        window.saveQuizSchedule = function () {
+            const startVal = document.getElementById('quiz-start-time')?.value;
+            const endVal   = document.getElementById('quiz-end-time')?.value;
+            const msgEl    = document.getElementById('schedule-save-msg');
+
+            if (!startVal) {
+                msgEl.textContent = '⚠️  Please set a quiz open time first.';
+                msgEl.style.background = 'rgba(255,71,87,0.08)';
+                msgEl.style.border     = '1px solid rgba(255,71,87,0.3)';
+                msgEl.style.color      = '#ff4757';
+                msgEl.style.display    = 'block';
+                return;
+            }
+            if (endVal && new Date(endVal) <= new Date(startVal)) {
+                msgEl.textContent = '⚠️  Close time must be after open time.';
+                msgEl.style.background = 'rgba(255,71,87,0.08)';
+                msgEl.style.border     = '1px solid rgba(255,71,87,0.3)';
+                msgEl.style.color      = '#ff4757';
+                msgEl.style.display    = 'block';
+                return;
+            }
+
+            localStorage.setItem(SCHED_KEY, JSON.stringify({ startTime: startVal, endTime: endVal || null }));
+
+            msgEl.textContent = '✅ Schedule saved! Students will see a countdown on quiz.html.';
+            msgEl.style.background = 'rgba(0,255,136,0.07)';
+            msgEl.style.border     = '1px solid rgba(0,255,136,0.3)';
+            msgEl.style.color      = 'var(--neon-green)';
+            msgEl.style.display    = 'block';
+            setTimeout(() => msgEl.style.display = 'none', 4000);
+            loadScheduleState();
+        };
+
+        window.clearQuizSchedule = function () {
+            localStorage.removeItem(SCHED_KEY);
+            const startEl = document.getElementById('quiz-start-time');
+            const endEl   = document.getElementById('quiz-end-time');
+            if (startEl) startEl.value = '';
+            if (endEl)   endEl.value   = '';
+            const msgEl = document.getElementById('schedule-save-msg');
+            msgEl.textContent = '🗑 Schedule cleared. Quiz is now always open.';
+            msgEl.style.background = 'rgba(255,159,67,0.07)';
+            msgEl.style.border     = '1px solid rgba(255,159,67,0.3)';
+            msgEl.style.color      = '#ff9f43';
+            msgEl.style.display    = 'block';
+            setTimeout(() => msgEl.style.display = 'none', 4000);
+            loadScheduleState();
+        };
 
         // ─── Export CSV ──────────────────────────────────────────
         window.exportCSV = function () {
@@ -1415,13 +1773,142 @@
             showModal('✅', 'Question Bank Updated', 'Successfully appended question strictly to local draft pool.', 'Awesome');
         }
 
+        let parsedRoundsData = {};
+
+        // Expose to window for inline onclick execution
+        window.handleFileSelect = function(e) {
+            if(e.target.files.length > 0) processFile(e.target.files[0]);
+        };
+
+        window.deployRoundsToQuiz = async function() {
+            showModal('🚀', 'Deploy Quiz Data?', `Load ${Object.keys(parsedRoundsData).length} rounds into live DB?`, 'Yes!', async () => {
+                const statusEl = document.getElementById('upload-status');
+                statusEl.innerText = "Deploying to Virtual DB...";
+                statusEl.style.display = 'block';
+
+                try {
+                    const res = await fetch('http://localhost:5003/api/admin/quizzes/bulk', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ rounds: parsedRoundsData })
+                    });
+                    
+                    if (res.ok) {
+                        showModal('✅', 'Deployment Complete', 'Rounds successfully pushed to Virtual DB!', 'Awesome');
+                        statusEl.innerText = "Deployed successfully!";
+                        setTimeout(loadOverview, 1000); // refresh dashboard
+                    } else {
+                        throw new Error("Failed to deploy API");
+                    }
+                } catch(err) {
+                    showModal('⚠️', 'Deployment Error', 'Failed to connect to backend.', 'Got It');
+                }
+            });
+        };
+
+        function processFile(file) {
+            const statusEl = document.getElementById('upload-status');
+            statusEl.style.display = 'block'; statusEl.style.color = 'var(--neon-blue)';
+            statusEl.innerText = `Reading ${file.name}...`;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const workbook = XLSX.read(e.target.result, {type: 'array'});
+                    parsedRoundsData = {};
+                    
+                    workbook.SheetNames.forEach(sheetName => {
+                        const roa = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], {header: 1});
+                        if(roa.length > 1) { 
+                            const headers = roa[0].map(h => String(h).toLowerCase().trim());
+                            const qIdx = headers.findIndex(h => h.includes('question') || h === 'q');
+                            let aIdx = headers.findIndex(h => h.includes('option a') || h === 'a' || h === 'option_a');
+                            let bIdx = headers.findIndex(h => h.includes('option b') || h === 'b' || h === 'option_b');
+                            let cIdx = headers.findIndex(h => h.includes('option c') || h === 'c' || h === 'option_c');
+                            let dIdx = headers.findIndex(h => h.includes('option d') || h === 'd' || h === 'option_d');
+                            const ansIdx = headers.findIndex(h => h.includes('answer') || h === 'correct' || h === 'ans');
+                            
+                            if (qIdx !== -1 && ansIdx !== -1) {
+                                let questions = [];
+                                for(let i=1; i<roa.length; i++) {
+                                    const row = roa[i];
+                                    if(!row[qIdx]) continue;
+                                    let opts = [];
+                                    if (aIdx !== -1 && row[aIdx]) opts.push(row[aIdx]);
+                                    if (bIdx !== -1 && row[bIdx]) opts.push(row[bIdx]);
+                                    if (cIdx !== -1 && row[cIdx]) opts.push(row[cIdx]);
+                                    if (dIdx !== -1 && row[dIdx]) opts.push(row[dIdx]);
+                                    questions.push({ question: row[qIdx], options: opts.filter(Boolean), answer: row[ansIdx] });
+                                }
+                                if(questions.length > 0) parsedRoundsData[sheetName] = questions;
+                            }
+                        }
+                    });
+                    
+                    if (Object.keys(parsedRoundsData).length === 0) throw new Error("No questions found.");
+                    
+                    statusEl.style.color = 'var(--neon-green)';
+                    statusEl.innerText = `Successfully parsed ${Object.keys(parsedRoundsData).length} rounds!`;
+                    renderRoundTabs();
+                    
+                } catch(err) {
+                    statusEl.style.color = '#ff4757'; statusEl.innerText = `Error parsing file: ${err.message}`;
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function renderRoundTabs() {
+            document.getElementById('csv-upload-zone').style.display = 'none';
+            document.getElementById('round-tabs-bar').style.display = 'block';
+            document.getElementById('parsed-preview-area').style.display = 'block';
+            
+            const btnContainer = document.getElementById('round-tab-buttons');
+            btnContainer.innerHTML = '';
+            
+            Object.keys(parsedRoundsData).forEach((round, idx) => {
+                const btn = document.createElement('button');
+                btn.className = `btn-sm ${idx===0 ? 'primary' : 'secondary'}`;
+                btn.style.padding = '4px 12px';
+                btn.innerText = `${round} (${parsedRoundsData[round].length} Qs)`;
+                btn.onclick = () => {
+                    Array.from(btnContainer.children).forEach(c => c.className = 'btn-sm secondary');
+                    btn.className = 'btn-sm primary';
+                    renderPreview(round);
+                };
+                btnContainer.appendChild(btn);
+            });
+            
+            if(Object.keys(parsedRoundsData).length > 0) renderPreview(Object.keys(parsedRoundsData)[0]);
+        }
+
+        function renderPreview(roundName) {
+            const list = document.getElementById('questions-preview-list');
+            list.innerHTML = '';
+            document.getElementById('preview-heading').innerText = `${roundName} Questions (${parsedRoundsData[roundName].length})`;
+            
+            parsedRoundsData[roundName].forEach((q, idx) => {
+                const optionsHtml = q.options.map(o => `<div style="font-size:0.8rem;color:var(--text-muted);display:inline-block;padding:2px 8px;background:rgba(255,255,255,0.05);border-radius:4px;margin-right:4px;">${o}</div>`).join('');
+                list.innerHTML += `
+                    <div style="background:var(--bg-card);padding:12px;border:1px solid var(--border);border-radius:8px;">
+                        <div style="display:flex;gap:12px;">
+                            <div style="color:var(--neon-blue);font-weight:bold;">Q${idx+1}</div>
+                            <div>
+                                <div style="margin-bottom:8px;">${q.question}</div><div>${optionsHtml}</div>
+                                <div style="font-size:0.85rem;color:var(--neon-green);margin-top:4px;">✓ Answer: ${q.answer}</div>
+                            </div>
+                        </div>
+                    </div>`;
+            });
+        }
+
     })();
     </script>
 
     <!-- ===== FIREBASE ADMIN LISTENER (ES Module) ===== -->
     <script type="module">
         import { initializeApp }   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-        import { getFirestore, collection, query, orderBy, onSnapshot }
+        import { getFirestore, collection, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc }
                                    from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
         const firebaseConfig = {
@@ -1442,12 +1929,36 @@
         onSnapshot(q, (snapshot) => {
             const results = [];
             snapshot.forEach(doc => results.push({ id: doc.id, ...doc.data() }));
-            window.__fbAllResults = results;  // store globally for CSV export
+            window.__fbAllResults = results;
             window.renderFirebaseResults(results);
         }, (err) => {
             console.error('Firebase listener error:', err);
             showBanner('❌ Firebase connection error: ' + err.message, 'error');
         });
+
+        // ─── Delete all docs for a student ────────────────────────
+        window.deleteStudentResults = async function(email) {
+            const toDelete = (window.__fbAllResults || []).filter(r => (r.email || r.name || r.studentId) === email);
+            if (!toDelete.length) { showBanner('⚠️ No records found for this student.', 'error'); return; }
+            try {
+                await Promise.all(toDelete.map(r => deleteDoc(doc(db, 'quiz_results', r.id))));
+                showBanner(`✅ Deleted ${toDelete.length} record(s) for ${email}`, 'success');
+            } catch (err) {
+                showBanner('❌ Delete failed: ' + err.message, 'error');
+            }
+        };
+
+        // ─── Update a specific round doc ──────────────────────────
+        window.saveEditToFirebase = async function(docId, fields) {
+            try {
+                await updateDoc(doc(db, 'quiz_results', docId), fields);
+                showBanner('✅ Result updated and synced to Firebase!', 'success');
+                return true;
+            } catch (err) {
+                showBanner('❌ Update failed: ' + err.message, 'error');
+                return false;
+            }
+        };
 
         function showBanner(msg, type) {
             const el = document.getElementById('fb-status-banner');
@@ -1457,6 +1968,7 @@
             el.style.border     = type === 'error' ? '1px solid rgba(255,71,87,0.3)' : '1px solid rgba(0,255,136,0.3)';
             el.style.color      = type === 'error' ? '#ff4757' : 'var(--neon-green)';
             el.textContent = msg;
+            if (type !== 'error') setTimeout(() => el.style.display = 'none', 4000);
         }
     </script>
 
@@ -1490,32 +2002,42 @@
         </div>`;
     }
 
+    // ─── Global: stores docIds per student key per round ──────────
+    window.__studentDocIds = {};
+
     window.renderFirebaseResults = function(allResults) {
-        // ── Group results by student email (or name as fallback) ──
+        // ── Group results by student email ──
         const studentMap = {};
         allResults.forEach(r => {
             const key = r.email || r.studentId || r.name || 'unknown';
             if (!studentMap[key]) {
                 studentMap[key] = {
-                    name:           r.name,
-                    email:          r.email,
-                    department:     r.department,
-                    rounds:         {},           // { 1: resultObj, 2: resultObj, 3: resultObj }
+                    name:            r.name,
+                    email:           r.email,
+                    department:      r.department,
+                    rounds:          {},
+                    docIds:          {},   // { 1: docId, 2: docId, 3: docId }
                     totalViolations: 0,
-                    lastTimestamp:  null
+                    lastTimestamp:   null
                 };
             }
             const s = studentMap[key];
             s.rounds[r.round] = r;
+            s.docIds[r.round]  = r.id;   // track Firestore document ID
             s.totalViolations += (r.violations || 0);
             if (!s.lastTimestamp || (r.timestamp && r.timestamp.seconds > (s.lastTimestamp?.seconds || 0))) {
                 s.lastTimestamp = r.timestamp;
             }
         });
 
+        // Save for edit modal to use
+        window.__studentDocIds = Object.fromEntries(
+            Object.entries(studentMap).map(([k, v]) => [k, v.docIds])
+        );
+
         const students = Object.values(studentMap);
 
-        // ── Stats (per unique student) ──
+        // ── Stats ──
         const totalStudents  = students.length;
         const completedAll   = students.filter(s => s.rounds[1] && s.rounds[2] && s.rounds[3]).length;
         const inProgress     = totalStudents - completedAll;
@@ -1531,7 +2053,6 @@
         if (el('fb-stat-update'))   el('fb-stat-update').textContent   = `Updated ${new Date().toLocaleTimeString('en-IN')}`;
         if (el('stat-quiz-attempts')) el('stat-quiz-attempts').textContent = allResults.length;
 
-        // ── Update stat card labels too ──
         const passedLabel = el('fb-stat-passed')?.closest('.stat-card')?.querySelector('.stat-card-label');
         const failedLabel = el('fb-stat-failed')?.closest('.stat-card')?.querySelector('.stat-card-label');
         const totalLabel  = el('fb-stat-total')?.closest('.stat-card')?.querySelector('.stat-card-label');
@@ -1539,10 +2060,9 @@
         if (failedLabel) failedLabel.textContent = 'In Progress';
         if (totalLabel)  totalLabel.textContent  = 'Total Students';
 
-        // ── Apply filters ──
+        // ── Filters ──
         const filterStatus = el('fb-filter-status')?.value || '';
         const filterDept   = el('fb-filter-dept')?.value   || '';
-
         let filtered = students;
         if (filterStatus === 'COMPLETED')   filtered = filtered.filter(s => s.rounds[1] && s.rounds[2] && s.rounds[3]);
         if (filterStatus === 'IN_PROGRESS') filtered = filtered.filter(s => !(s.rounds[1] && s.rounds[2] && s.rounds[3]));
@@ -1552,7 +2072,7 @@
         if (!tbody) return;
 
         if (!filtered.length) {
-            tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;padding:40px;color:var(--text-muted);">
+            tbody.innerHTML = `<tr><td colspan="12" style="text-align:center;padding:40px;color:var(--text-muted);">
                 <div style="font-size:1.5rem;margin-bottom:8px;">📋</div>
                 <div style="font-family:var(--font-mono);font-size:0.75rem;letter-spacing:2px;">NO STUDENTS MATCH FILTER</div>
             </td></tr>`;
@@ -1562,20 +2082,16 @@
         tbody.innerHTML = filtered.map((s, i) => {
             const roundsDone = [1,2,3].filter(r => s.rounds[r]).length;
             const allDone    = roundsDone === 3;
-
-            // Overall percentage = average of attempted rounds
             const attemptedRounds = [1,2,3].filter(r => s.rounds[r]);
             const overallPct = attemptedRounds.length
                 ? Math.round(attemptedRounds.reduce((sum, r) => sum + (s.rounds[r].percentage || 0), 0) / attemptedRounds.length)
                 : 0;
-            const overallColor = overallPct >= 80 ? 'var(--neon-green)' : overallPct >= 50 ? 'var(--neon-blue)' : '#ff4757';
-
-            // Progress badge
+            const overallColor  = overallPct >= 80 ? 'var(--neon-green)' : overallPct >= 50 ? 'var(--neon-blue)' : '#ff4757';
             const progressBadge = allDone
                 ? `<span class="status-badge active">✓ COMPLETED</span>`
                 : `<span class="status-badge pending">${roundsDone}/3 ROUNDS</span>`;
-
             const vColor = s.totalViolations > 0 ? '#ff4757' : 'var(--text-muted)';
+            const studentKey = encodeURIComponent(s.email || s.name || 'unknown');
 
             return `
             <tr>
@@ -1590,8 +2106,132 @@
                 <td style="font-family:var(--font-mono);color:${vColor};font-weight:700;">${s.totalViolations}</td>
                 <td>${progressBadge}</td>
                 <td style="font-size:0.78rem;color:var(--text-muted);">${formatTimestamp(s.lastTimestamp)}</td>
+                <td>
+                    <div style="display:flex;flex-direction:column;gap:6px;">
+                        <button onclick="openEditModal('${studentKey}', '${s.name || ''}', '${s.email || ''}')" style="padding:5px 10px;border-radius:7px;border:1px solid rgba(0,212,255,0.4);background:rgba(0,212,255,0.08);color:var(--neon-blue);font-family:var(--font-mono);font-size:0.65rem;letter-spacing:1px;cursor:pointer;transition:all 0.2s;white-space:nowrap;" onmouseover="this.style.background='rgba(0,212,255,0.18)'" onmouseout="this.style.background='rgba(0,212,255,0.08)'">✏️ EDIT</button>
+                        <button onclick="confirmDeleteStudent('${studentKey}', '${s.name || s.email || 'this student'}')" style="padding:5px 10px;border-radius:7px;border:1px solid rgba(255,71,87,0.4);background:rgba(255,71,87,0.08);color:#ff4757;font-family:var(--font-mono);font-size:0.65rem;letter-spacing:1px;cursor:pointer;transition:all 0.2s;white-space:nowrap;" onmouseover="this.style.background='rgba(255,71,87,0.2)'" onmouseout="this.style.background='rgba(255,71,87,0.08)'">🗑️ DELETE</button>
+                    </div>
+                </td>
             </tr>`;
         }).join('');
+    };
+
+    // ─── Open Edit Modal ─────────────────────────────────────────
+    window.openEditModal = function(encodedKey, name, email) {
+        const key = decodeURIComponent(encodedKey);
+        window.__editingStudentKey = key;
+        document.getElementById('edit-modal-student-info').textContent =
+            `STUDENT: ${name || email} // ${email}`;
+        // Pre-fill first available round
+        const docIds = window.__studentDocIds?.[key] || {};
+        const firstRound = [1,2,3].find(r => docIds[r]) || 1;
+        const sel = document.getElementById('edit-round-select');
+        sel.value = firstRound;
+        // Pre-fill round data
+        populateEditFields(firstRound, key);
+        sel.onchange = () => populateEditFields(parseInt(sel.value), key);
+
+        const modal = document.getElementById('edit-result-modal');
+        modal.style.display = 'flex';
+    };
+
+    function populateEditFields(round, key) {
+        const allResults = window.__fbAllResults || [];
+        const rec = allResults.find(r => (r.email || r.name || r.studentId) === key && r.round === round);
+        document.getElementById('edit-score').value      = rec ? rec.score      : '';
+        document.getElementById('edit-total').value      = rec ? rec.totalQuestions : '';
+        document.getElementById('edit-status').value     = rec ? rec.status     : 'FAILED';
+        document.getElementById('edit-violations').value = rec ? (rec.violations || 0) : 0;
+        const msgEl = document.getElementById('edit-modal-msg');
+        if (!rec) {
+            msgEl.textContent = `⚠️ No record found for Round ${round}. Saving will create it.`;
+            msgEl.style.display = 'block';
+            msgEl.style.color = '#ff9f43';
+            msgEl.style.background = 'rgba(255,159,67,0.08)';
+            msgEl.style.border = '1px solid rgba(255,159,67,0.3)';
+        } else {
+            msgEl.style.display = 'none';
+        }
+    }
+
+    // ─── Submit Edit ─────────────────────────────────────────────
+    window.submitEditResult = async function() {
+        const key   = window.__editingStudentKey;
+        const round = parseInt(document.getElementById('edit-round-select').value);
+        const score = parseInt(document.getElementById('edit-score').value);
+        const total = parseInt(document.getElementById('edit-total').value);
+        const status = document.getElementById('edit-status').value;
+        const violations = parseInt(document.getElementById('edit-violations').value) || 0;
+
+        const msgEl  = document.getElementById('edit-modal-msg');
+        const saveBtn = document.getElementById('edit-save-btn');
+
+        if (isNaN(score) || isNaN(total) || total < 1) {
+            msgEl.textContent = '⚠️ Please enter valid Score and Total Questions.';
+            msgEl.style.background = 'rgba(255,71,87,0.08)';
+            msgEl.style.border = '1px solid rgba(255,71,87,0.3)';
+            msgEl.style.color = '#ff4757';
+            msgEl.style.display = 'block';
+            return;
+        }
+
+        const percentage = Math.round((score / total) * 100);
+        const docId = window.__studentDocIds?.[key]?.[round];
+
+        if (!docId) {
+            msgEl.textContent = '⚠️ No existing Firestore record for this round. Cannot update.';
+            msgEl.style.background = 'rgba(255,71,87,0.08)';
+            msgEl.style.border = '1px solid rgba(255,71,87,0.3)';
+            msgEl.style.color = '#ff4757';
+            msgEl.style.display = 'block';
+            return;
+        }
+
+        saveBtn.textContent = '⌛ SYNCING...';
+        saveBtn.disabled = true;
+
+        const success = await window.saveEditToFirebase(docId, { score, totalQuestions: total, percentage, status, violations });
+
+        saveBtn.textContent = '💾 SAVE & SYNC';
+        saveBtn.disabled = false;
+
+        if (success) {
+            msgEl.textContent = `✅ Round ${round} updated! Score: ${score}/${total} (${percentage}%)`;
+            msgEl.style.background = 'rgba(0,255,136,0.07)';
+            msgEl.style.border = '1px solid rgba(0,255,136,0.3)';
+            msgEl.style.color = 'var(--neon-green)';
+            msgEl.style.display = 'block';
+            setTimeout(() => document.getElementById('edit-result-modal').style.display = 'none', 2000);
+        }
+    };
+
+    // ─── Confirm Delete ─────────────────────────────────────────
+    window.confirmDeleteStudent = function(encodedKey, name) {
+        const key = decodeURIComponent(encodedKey);
+        const modal = document.getElementById('cssc-modal');
+        if (modal) {
+            // Use existing CSSC modal if available
+            document.getElementById('modal-icon').textContent = '🗑️';
+            document.getElementById('modal-title').textContent = 'Delete All Records';
+            document.getElementById('modal-msg').textContent = `Delete ALL quiz records for "${name}"? This cannot be undone and will sync immediately to Firebase.`;
+            const confirmBtn = document.getElementById('modal-confirm');
+            const cancelBtn  = document.getElementById('modal-cancel');
+            confirmBtn.textContent = '🗑️ DELETE';
+            confirmBtn.style.background = '#ff4757';
+            cancelBtn.style.display = 'inline-block';
+            cancelBtn.textContent = 'Cancel';
+            confirmBtn.onclick = async () => {
+                modal.classList.remove('show');
+                confirmBtn.style.background = '';
+                await window.deleteStudentResults(key);
+            };
+            cancelBtn.onclick = () => { modal.classList.remove('show'); confirmBtn.style.background = ''; };
+            modal.classList.add('show');
+        } else {
+            if (confirm(`Delete ALL quiz records for "${name}"?`)) {
+                window.deleteStudentResults(key);
+            }
+        }
     };
 
     // Re-render on filter change
@@ -1601,5 +2241,85 @@
         });
     });
     </script>
+
+    <!-- CODING ARENA ADDITION START: Add Problem Modal -->
+    <div id="ca-prob-modal" class="modal-overlay">
+      <div class="modal-card" style="max-width:720px;max-height:90vh;overflow-y:auto;">
+        <div class="modal-header"><h2 id="ca-prob-modal-title">➕ Add Problem</h2><button class="modal-close" onclick="document.getElementById('ca-prob-modal').classList.remove('show')">✕</button></div>
+        <div class="form-grid full"><div class="form-group"><label>Problem Title</label><input type="text" id="cap-title" class="builder-input" placeholder="e.g. Two Sum Secure"/></div></div>
+        <div class="form-grid">
+          <div class="form-group"><label>Difficulty</label>
+            <select id="cap-diff" class="builder-select"><option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option></select>
+          </div>
+          <div class="form-group"><label>Marks</label><input type="number" id="cap-marks" class="builder-input" value="10" min="1"/></div>
+          <div class="form-group"><label>Time Limit (seconds)</label><input type="number" id="cap-time" class="builder-input" value="1800" min="60"/></div>
+          <div class="form-group"><label>Status</label>
+            <select id="cap-status" class="builder-select"><option value="active">Active</option><option value="inactive">Inactive</option></select>
+          </div>
+        </div>
+        <div class="form-grid full"><div class="form-group"><label>Description</label><textarea id="cap-desc" class="builder-textarea" rows="4" placeholder="Full problem statement..."></textarea></div></div>
+        <div class="form-grid full"><div class="form-group"><label>Constraints</label><textarea id="cap-constr" class="builder-textarea" rows="2" placeholder="1 ≤ n ≤ 1000"></textarea></div></div>
+        <div class="form-grid">
+          <div class="form-group"><label>Sample Input</label><textarea id="cap-sinput" class="builder-textarea" rows="3" placeholder="5"></textarea></div>
+          <div class="form-group"><label>Sample Output</label><textarea id="cap-soutput" class="builder-textarea" rows="3" placeholder="25"></textarea></div>
+        </div>
+        <div class="form-group" style="margin-bottom:16px;">
+          <label style="font-family:var(--font-mono);font-size:0.7rem;letter-spacing:2px;color:var(--neon-blue);">ALLOWED LANGUAGES</label>
+          <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;">
+            <label style="display:flex;gap:6px;align-items:center;font-size:0.9rem;"><input type="checkbox" name="cap-lang" value="python" checked/> Python</label>
+            <label style="display:flex;gap:6px;align-items:center;font-size:0.9rem;"><input type="checkbox" name="cap-lang" value="c++"/> C++</label>
+            <label style="display:flex;gap:6px;align-items:center;font-size:0.9rem;"><input type="checkbox" name="cap-lang" value="java"/> Java</label>
+            <label style="display:flex;gap:6px;align-items:center;font-size:0.9rem;"><input type="checkbox" name="cap-lang" value="javascript"/> JavaScript</label>
+            <label style="display:flex;gap:6px;align-items:center;font-size:0.9rem;"><input type="checkbox" name="cap-lang" value="c"/> C</label>
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:20px;">
+          <label style="font-family:var(--font-mono);font-size:0.7rem;letter-spacing:2px;color:var(--neon-blue);">HIDDEN TEST CASES</label>
+          <div id="cap-tcs" style="display:flex;flex-direction:column;gap:10px;margin-top:10px;"></div>
+          <button class="btn-sm secondary" onclick="addCaTestCase()" style="margin-top:10px;">+ Add Test Case</button>
+        </div>
+        <div id="cap-modal-msg" style="display:none;margin-bottom:12px;padding:10px;border-radius:8px;font-family:var(--font-mono);font-size:0.72rem;"></div>
+        <div style="display:flex;gap:12px;">
+          <button id="cap-save-btn" onclick="saveCaProblem()" class="btn-sm primary" style="flex:1;padding:14px;">💾 SAVE TO FIREBASE</button>
+          <button onclick="document.getElementById('ca-prob-modal').classList.remove('show')" class="btn-sm secondary" style="flex:1;padding:14px;">✕ Cancel</button>
+        </div>
+      </div>
+    </div>
+    <!-- CODING ARENA ADDITION END: Add Problem Modal -->
+
+    <!-- CODING ARENA ADDITION START -->
+    <style>
+    .ca-admin-tab{font-family:var(--font-mono);font-size:0.68rem;letter-spacing:2px;padding:8px 18px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-secondary);cursor:pointer;transition:all .2s;}
+    .ca-admin-tab.active,.ca-admin-tab:hover{border-color:var(--neon-blue);color:var(--neon-blue);background:rgba(0,212,255,.07);}
+    </style>
+    <script>
+    window.switchCaTab=function(btn){const tab=btn.dataset.caTab;document.querySelectorAll('.ca-admin-tab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');['problems','submissions','leaderboard'].forEach(t=>{const el=document.getElementById('ca-tab-'+t);if(el)el.style.display=t===tab?'block':'none';});};
+    window.addCaTestCase=function(){const c=document.getElementById('cap-tcs'),i=c.children.length,d=document.createElement('div');d.style.cssText='display:grid;grid-template-columns:1fr 1fr auto;gap:10px;';d.innerHTML='<div><label style="font-family:var(--font-mono);font-size:0.6rem;color:var(--text-muted);">INPUT '+(i+1)+'</label><textarea class="builder-textarea cap-tc-input" rows="2"></textarea></div><div><label style="font-family:var(--font-mono);font-size:0.6rem;color:var(--text-muted);">EXPECTED '+(i+1)+'</label><textarea class="builder-textarea cap-tc-output" rows="2"></textarea></div><button onclick="this.parentElement.remove()" style="margin-top:22px;padding:5px 9px;border-radius:6px;border:1px solid rgba(255,71,87,.4);background:rgba(255,71,87,.08);color:#ff4757;cursor:pointer;">X</button>';c.appendChild(d);};
+    window.saveCaProblem=async function(){const title=document.getElementById('cap-title').value.trim();if(!title){capMsg('Title required.',false);return;}const langs=Array.from(document.querySelectorAll('input[name="cap-lang"]:checked')).map(c=>c.value);if(!langs.length){capMsg('Select a language.',false);return;}const tcs=Array.from(document.querySelectorAll('#cap-tcs > div')).map(r=>({input:r.querySelector('.cap-tc-input')?.value||'',expectedOutput:r.querySelector('.cap-tc-output')?.value||''}));const data={title,difficulty:document.getElementById('cap-diff').value,marks:parseInt(document.getElementById('cap-marks').value)||10,timeLimitSeconds:parseInt(document.getElementById('cap-time').value)||1800,description:document.getElementById('cap-desc').value.trim(),constraints:document.getElementById('cap-constr').value.trim(),sampleInput:document.getElementById('cap-sinput').value.trim(),sampleOutput:document.getElementById('cap-soutput').value.trim(),allowedLanguages:langs,hiddenTestCases:tcs,status:document.getElementById('cap-status').value,createdAt:window.__serverTimestamp?window.__serverTimestamp():new Date()};const btn=document.getElementById('cap-save-btn');btn.textContent='Saving...';btn.disabled=true;try{const db=window.__csscDb;if(!db)throw new Error('Firebase not ready');const eid=document.getElementById('ca-prob-modal').dataset.editId;if(eid)await window.__updateDocFn(window.__doc(db,'codingProblems',eid),data);else await window.__addDoc(window.__collection(db,'codingProblems'),data);capMsg('Saved!',true);setTimeout(()=>{document.getElementById('ca-prob-modal').classList.remove('show');resetCap();},1500);}catch(e){capMsg(e.message,false);}btn.textContent='Save to Firebase';btn.disabled=false;};
+    function capMsg(t,ok){const el=document.getElementById('cap-modal-msg');el.textContent=t;el.style.color=ok?'var(--neon-green)':'#ff4757';el.style.background=ok?'rgba(0,255,136,.07)':'rgba(255,71,87,.07)';el.style.border=ok?'1px solid rgba(0,255,136,.3)':'1px solid rgba(255,71,87,.3)';el.style.display='block';}
+    function resetCap(){['cap-title','cap-desc','cap-constr','cap-sinput','cap-soutput'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});document.getElementById('cap-marks').value='10';document.getElementById('cap-time').value='1800';document.querySelectorAll('input[name="cap-lang"]').forEach(c=>c.checked=c.value==='python');document.getElementById('cap-tcs').innerHTML='';document.getElementById('cap-modal-msg').style.display='none';document.getElementById('ca-prob-modal').removeAttribute('data-edit-id');document.getElementById('ca-prob-modal-title').textContent='Add Problem';}
+    window.deleteCaProblem=async function(id){if(!confirm('Delete permanently?'))return;try{await window.__deleteDocFn(window.__doc(window.__csscDb,'codingProblems',id));}catch(e){alert(e.message);}};
+    window.toggleCaProblemStatus=async function(id,cur){try{await window.__updateDocFn(window.__doc(window.__csscDb,'codingProblems',id),{status:cur==='active'?'inactive':'active'});}catch(e){alert(e.message);}};
+    function renderCaProblems(list){const tbody=document.getElementById('ca-problems-tbody');if(!tbody)return;if(!list.length){tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted);">NO PROBLEMS YET</td></tr>';return;}const dc={easy:'var(--neon-green)',medium:'#ff9f43',hard:'#ff4757'};tbody.innerHTML=list.map((p,i)=>'<tr><td style="font-family:var(--font-mono);color:var(--text-muted);">#'+String(i+1).padStart(3,'0')+'</td><td style="font-weight:700;">'+p.title+'</td><td><span style="font-family:var(--font-mono);font-size:0.65rem;padding:3px 8px;border-radius:6px;color:'+(dc[p.difficulty]||'white')+';border:1px solid '+(dc[p.difficulty]||'var(--border)')+';">'+p.difficulty+'</span></td><td style="font-family:var(--font-mono);color:var(--neon-blue);">'+p.marks+'</td><td>'+(p.allowedLanguages||[]).map(l=>'<span style="font-family:var(--font-mono);font-size:0.58rem;padding:2px 6px;border:1px solid var(--border);border-radius:4px;color:var(--text-muted);">'+l+'</span>').join(' ')+'</td><td><span onclick="toggleCaProblemStatus(\''+p.id+'\',\''+p.status+'\')" style="cursor:pointer;font-family:var(--font-mono);font-size:0.65rem;padding:3px 8px;border-radius:6px;'+(p.status==='active'?'color:var(--neon-green);border:1px solid rgba(0,255,136,.4);':'color:#ff4757;border:1px solid rgba(255,71,87,.4);')+'">'+p.status+'</span></td><td><button onclick="deleteCaProblem(\''+p.id+'\')" style="padding:4px 10px;border-radius:6px;border:1px solid rgba(255,71,87,.4);background:rgba(255,71,87,.08);color:#ff4757;cursor:pointer;font-size:0.7rem;">Delete</button></td></tr>').join('');}
+    function renderCaSubs(list){const tbody=document.getElementById('ca-subs-tbody');if(!tbody)return;const fV=document.getElementById('ca-filter-verdict')?.value||'';const fD=document.getElementById('ca-filter-dept-sub')?.value||'';let f=list;if(fV)f=f.filter(s=>s.verdict===fV);if(fD)f=f.filter(s=>s.department===fD);if(!f.length){tbody.innerHTML='<tr><td colspan="11" style="text-align:center;padding:32px;color:var(--text-muted);">No submissions match filter.</td></tr>';return;}const vc=v=>v==='Accepted'?'var(--neon-green)':v==='Partial'?'#ff9f43':'#ff4757';tbody.innerHTML=f.map((s,i)=>'<tr><td style="font-family:var(--font-mono);color:var(--text-muted);">#'+String(i+1).padStart(3,'0')+'</td><td style="font-weight:700;">'+(s.studentName||'?')+'</td><td style="font-size:0.78rem;">'+(s.email||'?')+'</td><td style="font-family:var(--font-mono);color:var(--neon-blue);">'+(s.department||'?')+'</td><td>'+(s.problemTitle||'?')+'</td><td style="font-family:var(--font-mono);">'+(s.language||'?')+'</td><td style="font-family:var(--font-mono);font-weight:700;color:'+vc(s.verdict)+'">'+(s.verdict||'?')+'</td><td style="font-family:var(--font-mono);color:var(--neon-blue);">'+(s.score||0)+'</td><td style="font-family:var(--font-mono);">'+(s.testCasesPassed||0)+'/'+(s.totalTestCases||0)+'</td><td style="font-size:0.72rem;color:var(--text-muted);">'+(s.submittedAt?.seconds?new Date(s.submittedAt.seconds*1000).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'?')+'</td><td><details><summary style="cursor:pointer;font-size:0.7rem;color:var(--text-muted);">View</summary><pre style="font-size:0.65rem;background:rgba(0,0,0,.4);padding:8px;border-radius:6px;color:var(--neon-green);max-width:240px;overflow:auto;white-space:pre-wrap;">'+(s.code||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</pre></details></td></tr>').join('');}
+    function renderCaLeaderboard(subs){const byS={};subs.forEach(s=>{if(s.verdict!=='Accepted')return;const k=s.email||s.studentName||'?';if(!byS[k])byS[k]={name:s.studentName,dept:s.department,probs:new Set(),score:0};byS[k].probs.add(s.problemId);byS[k].score+=(s.score||0);});const ranked=Object.values(byS).sort((a,b)=>b.score-a.score);const tbody=document.getElementById('ca-leaderboard-tbody');if(!tbody)return;if(!ranked.length){tbody.innerHTML='<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--text-muted);">No accepted submissions yet.</td></tr>';return;}tbody.innerHTML=ranked.map((r,i)=>'<tr><td style="font-family:var(--font-mono);font-weight:900;color:'+(i===0?'#ffd700':i===1?'#c0c0c0':i===2?'#cd7f32':'var(--text-muted)')+';">'+(i===0?'Gold':i===1?'Silver':i===2?'Bronze':'#'+String(i+1).padStart(2,'0'))+'</td><td style="font-weight:700;">'+(r.name||'?')+'</td><td style="font-family:var(--font-mono);color:var(--neon-blue);">'+(r.dept||'?')+'</td><td style="font-family:var(--font-mono);color:var(--neon-green);font-weight:700;">'+r.probs.size+'</td><td style="font-family:var(--font-mono);font-weight:900;color:var(--neon-blue);">'+r.score+'</td></tr>').join('');}
+    window.exportCaSubmissionsCSV=function(){const subs=window.__caAllSubs||[];if(!subs.length){alert('No data.');return;}const cols=['studentName','email','department','problemTitle','language','verdict','score','testCasesPassed','totalTestCases'];const csv=[cols.join(','),...subs.map(s=>cols.map(c=>'"'+(s[c]||'')+'"').join(','))].join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='cssc_coding_submissions.csv';a.click();};
+    ['ca-filter-verdict','ca-filter-dept-sub'].forEach(id=>{document.getElementById(id)?.addEventListener('change',()=>{if(window.__caAllSubs)renderCaSubs(window.__caAllSubs);});});
+    window.__renderCaProblems=renderCaProblems;window.__renderCaSubs=renderCaSubs;window.__renderCaLeaderboard=renderCaLeaderboard;
+    </script>
+    <script type="module">
+    import { getApps, initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+    import { getFirestore, collection, onSnapshot, orderBy, query, addDoc, doc, deleteDoc, updateDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+    const cfg={apiKey:'AIzaSyBDzUCgdQ2go81-Z7t-Ky7_wNBQryAUC7Q',authDomain:'cssc-quizes-system.firebaseapp.com',projectId:'cssc-quizes-system',storageBucket:'cssc-quizes-system.firebasestorage.app',messagingSenderId:'499593375023',appId:'1:499593375023:web:836a3ea31fe9a1c29105da'};
+    const app=getApps().find(a=>a.name==='[DEFAULT]')||initializeApp(cfg);
+    const db=getFirestore(app);
+    window.__updateDocFn=updateDoc;window.__deleteDocFn=deleteDoc;
+    if(!window.__serverTimestamp)window.__serverTimestamp=serverTimestamp;
+    if(!window.__addDoc)window.__addDoc=addDoc;if(!window.__collection)window.__collection=collection;if(!window.__doc)window.__doc=doc;if(!window.__csscDb)window.__csscDb=db;
+    onSnapshot(query(collection(db,'codingProblems'),orderBy('createdAt','desc')),snap=>{const list=[];snap.forEach(d=>list.push({id:d.id,...d.data()}));window.__caAllProblems=list;if(window.__renderCaProblems)window.__renderCaProblems(list);});
+    onSnapshot(query(collection(db,'codingSubmissions'),orderBy('submittedAt','desc')),snap=>{const subs=[];snap.forEach(d=>subs.push({id:d.id,...d.data()}));window.__caAllSubs=subs;if(window.__renderCaSubs)window.__renderCaSubs(subs);if(window.__renderCaLeaderboard)window.__renderCaLeaderboard(subs);});
+    </script>
+    <!-- CODING ARENA ADDITION END -->
+
 </body>
 </html>

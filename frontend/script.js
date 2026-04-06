@@ -529,8 +529,8 @@ document.querySelectorAll('.footer-year').forEach(el => {
     const wrap = document.getElementById('countdown-wrap');
     if (!wrap) return;
 
-    // Launch date: March 25, 2026 at 00:00:00 IST (UTC+5:30)
-    const LAUNCH = new Date('2026-03-25T00:00:00+05:30').getTime();
+    // Launch date: April 9, 2026 at 11:00 AM IST (UTC+5:30)
+    const LAUNCH = new Date('2026-04-09T11:00:00+05:30').getTime();
 
     const elDays = document.getElementById('cd-days');
     const elHours = document.getElementById('cd-hours');
@@ -558,8 +558,8 @@ document.querySelectorAll('.footer-year').forEach(el => {
             // Club has launched!
             wrap.classList.add('launched');
             wrap.innerHTML = `
-                <div class="launched-msg">🎉 CSSC IS OFFICIALLY LAUNCHED! 🎉</div>
-                <div class="countdown-date">📅 Established March 25, 2026</div>
+                <div class="launched-msg">🎉 WEBSITE IS OFFICIALLY LIVE! 🎉</div>
+                <div class="countdown-date">📅 Launched April 9, 2026 · 11:00 AM IST</div>
             `;
             return; // stop ticking
         }

@@ -451,6 +451,7 @@
             <li><a href="index.html">Home</a></li>
             <li><a href="about.html">About</a></li>
             <li><a href="quiz.html" class="active">Quiz Arena</a></li>
+            <li><a href="coding.html" style="color:#ff9f43;">🖥️ Coding Arena</a></li>
             <li><a href="team.html">Team</a></li>
             <li><a href="admin.html" style="color:var(--neon-blue);font-family:var(--font-mono);font-size:0.75rem;letter-spacing:1px;">⚙ ADMIN</a></li>
             <li><a href="register.html" class="nav-cta">Join Club</a></li>
@@ -463,6 +464,7 @@
         <a href="index.html">🏠 Home</a>
         <a href="about.html">👨‍💻 About CSSC</a>
         <a href="quiz.html">🧪 Quiz Arena</a>
+        <a href="coding.html">🖥️ Coding Arena</a>
         <a href="team.html">👥 Team</a>
         <a href="admin.html">⚙️ Admin Panel</a>
         <a href="register.html">📝 Join Club</a>
@@ -554,6 +556,109 @@
         }
         #student-login-form input:focus { border-color: var(--neon-blue) !important; }
     </style>
+
+    <!-- ===== QUIZ SCHEDULE LOCKOUT SCREEN ===== -->
+    <div id="quiz-schedule-lockout" style="display:none; position:fixed; inset:0; z-index:9990; background:rgba(10,10,15,0.97); backdrop-filter:blur(12px); align-items:center; justify-content:center; flex-direction:column; text-align:center; padding:40px;">
+        <div style="max-width:520px; width:100%;">
+            <div id="qs-icon" style="font-size:4rem; margin-bottom:20px;">⏳</div>
+            <div id="qs-title" style="font-size:2.2rem; font-weight:900; color:var(--neon-blue); margin-bottom:6px; letter-spacing:-1px;">Quiz Not Started Yet</div>
+            <div id="qs-sub" style="font-family:var(--font-mono); font-size:0.65rem; letter-spacing:3px; color:rgba(0,212,255,0.5); margin-bottom:32px; text-transform:uppercase;">SCHEDULE_LOCK_ACTIVE // AWAIT_START_TIME</div>
+
+            <div style="background:var(--bg-card); border:1px solid rgba(0,212,255,0.25); border-radius:20px; padding:36px; margin-bottom:24px; position:relative; overflow:hidden;">
+                <div style="position:absolute;top:0;left:0;width:100%;height:2px;background:linear-gradient(90deg,transparent,var(--neon-blue),transparent);"></div>
+                <div style="font-family:var(--font-mono); font-size:0.65rem; letter-spacing:3px; color:rgba(0,212,255,0.5); margin-bottom:16px; text-transform:uppercase;">⚡ QUIZ OPENS IN</div>
+
+                <div style="display:flex; justify-content:center; align-items:center; gap:8px; margin-bottom:20px;" id="qs-countdown-digits">
+                    <div style="text-align:center;">
+                        <div id="qs-days" style="font-family:var(--font-mono);font-size:3rem;font-weight:900;color:var(--neon-blue);background:rgba(0,212,255,0.07);border:1px solid rgba(0,212,255,0.2);border-radius:12px;padding:12px 16px;min-width:80px;letter-spacing:2px;">00</div>
+                        <div style="font-family:var(--font-mono);font-size:0.55rem;color:var(--text-muted);letter-spacing:2px;margin-top:6px;">DAYS</div>
+                    </div>
+                    <div style="font-family:var(--font-mono);font-size:2.5rem;font-weight:900;color:rgba(0,212,255,0.3);margin-bottom:16px;animation:pulse 1s infinite;">:</div>
+                    <div style="text-align:center;">
+                        <div id="qs-hours" style="font-family:var(--font-mono);font-size:3rem;font-weight:900;color:var(--neon-blue);background:rgba(0,212,255,0.07);border:1px solid rgba(0,212,255,0.2);border-radius:12px;padding:12px 16px;min-width:80px;letter-spacing:2px;">00</div>
+                        <div style="font-family:var(--font-mono);font-size:0.55rem;color:var(--text-muted);letter-spacing:2px;margin-top:6px;">HRS</div>
+                    </div>
+                    <div style="font-family:var(--font-mono);font-size:2.5rem;font-weight:900;color:rgba(0,212,255,0.3);margin-bottom:16px;animation:pulse 1s infinite;">:</div>
+                    <div style="text-align:center;">
+                        <div id="qs-mins" style="font-family:var(--font-mono);font-size:3rem;font-weight:900;color:var(--neon-blue);background:rgba(0,212,255,0.07);border:1px solid rgba(0,212,255,0.2);border-radius:12px;padding:12px 16px;min-width:80px;letter-spacing:2px;">00</div>
+                        <div style="font-family:var(--font-mono);font-size:0.55rem;color:var(--text-muted);letter-spacing:2px;margin-top:6px;">MIN</div>
+                    </div>
+                    <div style="font-family:var(--font-mono);font-size:2.5rem;font-weight:900;color:rgba(0,212,255,0.3);margin-bottom:16px;animation:pulse 1s infinite;">:</div>
+                    <div style="text-align:center;">
+                        <div id="qs-secs" style="font-family:var(--font-mono);font-size:3rem;font-weight:900;color:var(--neon-blue);background:rgba(0,212,255,0.07);border:1px solid rgba(0,212,255,0.2);border-radius:12px;padding:12px 16px;min-width:80px;letter-spacing:2px;">00</div>
+                        <div style="font-family:var(--font-mono);font-size:0.55rem;color:var(--text-muted);letter-spacing:2px;margin-top:6px;">SEC</div>
+                    </div>
+                </div>
+
+                <div id="qs-open-date" style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-muted);letter-spacing:1px;margin-top:4px;"></div>
+            </div>
+
+            <p style="color:var(--text-secondary); font-size:0.88rem; line-height:1.7; background:rgba(0,212,255,0.04); border:1px solid rgba(0,212,255,0.1); border-radius:12px; padding:16px 20px;">
+                The quiz window has not opened yet. Please wait until the scheduled time. The page will automatically unlock once the quiz begins.
+            </p>
+        </div>
+    </div>
+
+    <script>
+    // ─── Quiz Schedule Enforcement ────────────────────────────────────────────
+    (function enforceQuizSchedule() {
+        const SCHED_KEY = 'cssc_quiz_schedule';
+        const saved = JSON.parse(localStorage.getItem(SCHED_KEY) || 'null');
+        if (!saved || !saved.startTime) return; // no schedule = open
+
+        const lockout   = document.getElementById('quiz-schedule-lockout');
+        const startTime = new Date(saved.startTime);
+        const endTime   = saved.endTime ? new Date(saved.endTime) : null;
+
+        const pad2 = n => String(n).padStart(2, '0');
+
+        function fmtFull(dt) {
+            return dt.toLocaleString('en-IN', { weekday:'short', day:'2-digit', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit', hour12:true });
+        }
+
+        function checkAndShow() {
+            const now = Date.now();
+
+            // Quiz window has passed
+            if (endTime && now > endTime.getTime()) {
+                lockout.style.display = 'flex';
+                document.getElementById('qs-icon').textContent = '🔒';
+                document.getElementById('qs-title').textContent = 'Quiz Window Closed';
+                document.getElementById('qs-title').style.color = '#ff4757';
+                document.getElementById('qs-sub').textContent = 'ACCESS_DENIED // WINDOW_EXPIRED';
+                document.getElementById('qs-sub').style.color = 'rgba(255,71,87,0.5)';
+                document.getElementById('qs-countdown-digits').style.display = 'none';
+                document.getElementById('qs-open-date').textContent = 'This quiz session ended at ' + fmtFull(endTime);
+                return;
+            }
+
+            // Quiz hasn't started
+            if (now < startTime.getTime()) {
+                lockout.style.display = 'flex';
+                document.getElementById('qs-open-date').textContent = '📅 Opens: ' + fmtFull(startTime);
+
+                const diff = startTime.getTime() - now;
+                const days  = Math.floor(diff / 86400000);
+                const hours = Math.floor((diff % 86400000) / 3600000);
+                const mins  = Math.floor((diff % 3600000) / 60000);
+                const secs  = Math.floor((diff % 60000) / 1000);
+
+                document.getElementById('qs-days').textContent  = pad2(days);
+                document.getElementById('qs-hours').textContent = pad2(hours);
+                document.getElementById('qs-mins').textContent  = pad2(mins);
+                document.getElementById('qs-secs').textContent  = pad2(secs);
+
+                setTimeout(checkAndShow, 1000);
+            } else {
+                // Time has arrived — unlock!
+                lockout.style.display = 'none';
+            }
+        }
+
+        checkAndShow();
+    })();
+    </script>
+
 
     <!-- ===== LOBBY ===== -->
     <div id="quiz-lobby">

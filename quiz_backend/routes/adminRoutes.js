@@ -1,10 +1,10 @@
-const express  = require('express');
-const router   = express.Router();
-const Quiz     = require('../models/Quiz');
+const express = require('express');
+const router  = express.Router();
+const Quiz    = require('../models/Quiz');
 const Question = require('../models/Question');
-const Result   = require('../models/Result');
-const User     = require('../models/User');
-const Member   = require('../models/Member');
+const Result  = require('../models/Result');
+const User    = require('../models/User');
+const Member  = require('../models/Member');
 
 // ─── QUIZ CRUD ────────────────────────────────────────────────────────
 // CREATE Quiz

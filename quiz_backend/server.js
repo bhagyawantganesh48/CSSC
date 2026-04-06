@@ -44,16 +44,16 @@ const connectDB = async () => {
     const { MongoMemoryServer } = require('mongodb-memory-server');
     const mongoServer = await MongoMemoryServer.create();
     MONGODB_URI = mongoServer.getUri();
-    // Connect FIRST, then seed
-    await mongoose.connect(MONGODB_URI, { serverSelectionTimeoutMS: 30000 });
+    // Connect FIRST, then seed (seed requires an active connection)
+    await mongoose.connect(MONGODB_URI);
     isConnected = true;
-    console.log('✅ MongoDB connected');
+    console.log('✅ MongoDB connected (in-memory)');
     const { seedData } = require('./seed');
     await seedData();
     return;
   }
 
-  await mongoose.connect(MONGODB_URI, { serverSelectionTimeoutMS: 30000 });
+  await mongoose.connect(MONGODB_URI);
   isConnected = true;
   console.log('✅ MongoDB connected');
 };

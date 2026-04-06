@@ -18,8 +18,8 @@ router.get('/quizzes', async (req, res) => {
 // Get questions for a specific quiz (student initiating quiz)
 router.get('/:quizId/questions', async (req, res) => {
   try {
+    // SECURITY: -correctAnswerIndex ensures answers are NEVER sent to the browser
     const questions = await Question.find({ quizId: req.params.quizId }).select('-correctAnswerIndex -createdAt -updatedAt');
-    // We do NOT send correctAnswerIndex to the frontend until submitted!
     res.json(questions);
   } catch (err) {
     res.status(500).json({ error: err.message });

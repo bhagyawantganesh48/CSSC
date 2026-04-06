@@ -33,8 +33,12 @@ const connectDB = async () => {
     const { MongoMemoryServer } = require('mongodb-memory-server');
     const mem = await MongoMemoryServer.create();
     uri = mem.getUri();
+    // Connect FIRST, then seed (seed requires an active connection)
+    await mongoose.connect(uri);
+    isConnected = true;
     const { seedData } = require('../quiz_backend/seed');
     await seedData();
+    return;
   }
   await mongoose.connect(uri);
   isConnected = true;

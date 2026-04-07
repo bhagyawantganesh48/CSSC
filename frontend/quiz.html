@@ -558,7 +558,7 @@
     </style>
 
     <!-- ===== QUIZ SCHEDULE LOCKOUT SCREEN ===== -->
-    <div id="quiz-schedule-lockout" style="display:none; position:fixed; inset:0; z-index:9990; background:rgba(10,10,15,0.97); backdrop-filter:blur(12px); align-items:center; justify-content:center; flex-direction:column; text-align:center; padding:40px;">
+    <div id="quiz-schedule-lockout" style="display:none; position:fixed; inset:0; z-index:10000; background:rgba(10,10,15,0.97); backdrop-filter:blur(12px); align-items:center; justify-content:center; flex-direction:column; text-align:center; padding:40px;">
         <div style="max-width:520px; width:100%;">
             <div id="qs-icon" style="font-size:4rem; margin-bottom:20px;">⏳</div>
             <div id="qs-title" style="font-size:2.2rem; font-weight:900; color:var(--neon-blue); margin-bottom:6px; letter-spacing:-1px;">Quiz Not Started Yet</div>
@@ -601,63 +601,187 @@
 
     <script>
     // ─── Quiz Schedule Enforcement ────────────────────────────────────────────
+    // Fetches the schedule from the backend. Falls back to localStorage.
     (function enforceQuizSchedule() {
-        const SCHED_KEY = 'cssc_quiz_schedule';
-        const saved = JSON.parse(localStorage.getItem(SCHED_KEY) || 'null');
-        if (!saved || !saved.startTime) return; // no schedule = open
-
-        const lockout   = document.getElementById('quiz-schedule-lockout');
-        const startTime = new Date(saved.startTime);
-        const endTime   = saved.endTime ? new Date(saved.endTime) : null;
-
-        const pad2 = n => String(n).padStart(2, '0');
+        const SCHED_KEY  = 'cssc_quiz_schedule';
+        const API        = 'http://localhost:5003/api';
+        const lockout    = document.getElementById('quiz-schedule-lockout');
+        const pad2       = n => String(n).padStart(2, '0');
+        let countdownTimer = null;
 
         function fmtFull(dt) {
-            return dt.toLocaleString('en-IN', { weekday:'short', day:'2-digit', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit', hour12:true });
+            return dt.toLocaleString('en-IN', {
+                weekday:'short', day:'2-digit', month:'long', year:'numeric',
+                hour:'2-digit', minute:'2-digit', hour12: true
+            });
         }
 
-        function checkAndShow() {
+        function runCountdown(startTime) {
+            if (countdownTimer) clearInterval(countdownTimer);
+            countdownTimer = setInterval(() => {
+                const now  = Date.now();
+                const diff = startTime.getTime() - now;
+
+                if (diff <= 0) {
+                    clearInterval(countdownTimer);
+                    lockout.style.display = 'none';
+                    return;
+                }
+
+                const days  = Math.floor(diff / 86400000);
+                const hours = Math.floor((diff % 86400000) / 3600000);
+                const mins  = Math.floor((diff % 3600000)  / 60000);
+                const secs  = Math.floor((diff % 60000)    / 1000);
+
+                const dEl = document.getElementById('qs-days');
+                const hEl = document.getElementById('qs-hours');
+                const mEl = document.getElementById('qs-mins');
+                const sEl = document.getElementById('qs-secs');
+                if (dEl) dEl.textContent = pad2(days);
+                if (hEl) hEl.textContent = pad2(hours);
+                if (mEl) mEl.textContent = pad2(mins);
+                if (sEl) sEl.textContent = pad2(secs);
+            }, 1000);
+
+            // Immediate first tick
+            const diff0 = startTime.getTime() - Date.now();
+            const days0  = Math.floor(diff0 / 86400000);
+            const hours0 = Math.floor((diff0 % 86400000) / 3600000);
+            const mins0  = Math.floor((diff0 % 3600000)  / 60000);
+            const secs0  = Math.floor((diff0 % 60000)    / 1000);
+            const dEl = document.getElementById('qs-days');
+            const hEl = document.getElementById('qs-hours');
+            const mEl = document.getElementById('qs-mins');
+            const sEl = document.getElementById('qs-secs');
+            if (dEl) dEl.textContent = pad2(days0);
+            if (hEl) hEl.textContent = pad2(hours0);
+            if (mEl) mEl.textContent = pad2(mins0);
+            if (sEl) sEl.textContent = pad2(secs0);
+        }
+
+        function enforceSchedule(startTime, endTime) {
             const now = Date.now();
 
-            // Quiz window has passed
+            // ── Window has closed ────────────────────────────────────
             if (endTime && now > endTime.getTime()) {
                 lockout.style.display = 'flex';
-                document.getElementById('qs-icon').textContent = '🔒';
-                document.getElementById('qs-title').textContent = 'Quiz Window Closed';
-                document.getElementById('qs-title').style.color = '#ff4757';
-                document.getElementById('qs-sub').textContent = 'ACCESS_DENIED // WINDOW_EXPIRED';
-                document.getElementById('qs-sub').style.color = 'rgba(255,71,87,0.5)';
-                document.getElementById('qs-countdown-digits').style.display = 'none';
-                document.getElementById('qs-open-date').textContent = 'This quiz session ended at ' + fmtFull(endTime);
+                const icon = document.getElementById('qs-icon');
+                const title = document.getElementById('qs-title');
+                const sub = document.getElementById('qs-sub');
+                const digits = document.getElementById('qs-countdown-digits');
+                const openDate = document.getElementById('qs-open-date');
+                if (icon)    icon.textContent  = '🔒';
+                if (title)   { title.textContent = 'Quiz Window Closed'; title.style.color = '#ff4757'; }
+                if (sub)     { sub.textContent  = 'ACCESS_DENIED // WINDOW_EXPIRED'; sub.style.color = 'rgba(255,71,87,0.5)'; }
+                if (digits)  digits.style.display = 'none';
+                if (openDate) openDate.textContent = 'This quiz session ended at ' + fmtFull(endTime);
                 return;
             }
 
-            // Quiz hasn't started
+            // ── Quiz hasn't started yet ──────────────────────────────
             if (now < startTime.getTime()) {
                 lockout.style.display = 'flex';
-                document.getElementById('qs-open-date').textContent = '📅 Opens: ' + fmtFull(startTime);
+                const openDate = document.getElementById('qs-open-date');
+                if (openDate) openDate.textContent = '📅 Opens: ' + fmtFull(startTime);
 
-                const diff = startTime.getTime() - now;
-                const days  = Math.floor(diff / 86400000);
-                const hours = Math.floor((diff % 86400000) / 3600000);
-                const mins  = Math.floor((diff % 3600000) / 60000);
-                const secs  = Math.floor((diff % 60000) / 1000);
+                // Reset title/icon to default "upcoming" state
+                const icon = document.getElementById('qs-icon');
+                const title = document.getElementById('qs-title');
+                const sub = document.getElementById('qs-sub');
+                const digits = document.getElementById('qs-countdown-digits');
+                if (icon)   icon.textContent  = '⏳';
+                if (title)  { title.textContent = 'Quiz Not Started Yet'; title.style.color = 'var(--neon-blue)'; }
+                if (sub)    { sub.textContent  = 'SCHEDULE_LOCK_ACTIVE // AWAIT_START_TIME'; sub.style.color = 'rgba(0,212,255,0.5)'; }
+                if (digits) digits.style.display = 'flex';
 
-                document.getElementById('qs-days').textContent  = pad2(days);
-                document.getElementById('qs-hours').textContent = pad2(hours);
-                document.getElementById('qs-mins').textContent  = pad2(mins);
-                document.getElementById('qs-secs').textContent  = pad2(secs);
-
-                setTimeout(checkAndShow, 1000);
-            } else {
-                // Time has arrived — unlock!
-                lockout.style.display = 'none';
+                runCountdown(startTime);
+                return;
             }
+
+            // ── Within the window → unlock ────────────────────────────
+            lockout.style.display = 'none';
+            if (countdownTimer) clearInterval(countdownTimer);
         }
 
-        checkAndShow();
+        async function init() {
+            // ── 1. Try to fetch schedule from backend ────────────────
+            try {
+                // Pointing to public endpoint which only returns ACTIVE quizzes
+                const res    = await fetch(`${API}/quiz/quizzes`);
+                const quizzes = await res.json();
+
+                if (Array.isArray(quizzes)) {
+                    // Find the FIRST active quiz that has a schedule set
+                    const scheduled = quizzes.find(q => q.scheduleStart);
+
+                    // Dynamically map actual backend questions to ROUNDS if we found an active quiz
+                    const activeQuiz = scheduled || (quizzes.length > 0 ? quizzes[0] : null);
+                    if (activeQuiz) {
+                        try {
+                            // The public endpoint to get questions for an active quiz
+                            const qRes = await fetch(`${API}/quiz/${activeQuiz._id}/questions`);
+                            const dbQuestions = await qRes.json();
+                            
+                            if (Array.isArray(dbQuestions) && dbQuestions.length > 0) {
+                                // Dynamically chunk into 3 rounds
+                                const qPerRound = Math.ceil(dbQuestions.length / 3);
+                                const formatQs = (qs) => qs.map(q => ({
+                                    q: q.questionText,
+                                    opts: q.options,
+                                    ans: q.correctAnswerIndex
+                                }));
+                                
+                                const baseTime = activeQuiz.durationMinutes ? Math.ceil(activeQuiz.durationMinutes / 3) : 10;
+                                
+                                ROUNDS = {
+                                    1: { title: activeQuiz.title || 'Part 1', category: 'ROUND 01', timeMin: baseTime, questions: formatQs(dbQuestions.slice(0, qPerRound)) },
+                                    2: { title: activeQuiz.title || 'Part 2', category: 'ROUND 02', timeMin: baseTime, questions: formatQs(dbQuestions.slice(qPerRound, qPerRound * 2)) },
+                                    3: { title: activeQuiz.title || 'Part 3', category: 'ROUND 03', timeMin: baseTime, questions: formatQs(dbQuestions.slice(qPerRound * 2)) }
+                                };
+                            }
+                        } catch(e) { console.error('[Schedule] Failed loading backend questions, using defaults', e); }
+                    }
+
+                    if (scheduled) {
+                        const startTime = new Date(scheduled.scheduleStart);
+                        const endTime   = scheduled.scheduleEnd ? new Date(scheduled.scheduleEnd) : null;
+
+                        // Persist fallback to localStorage
+                        localStorage.setItem('cssc_quiz_schedule', JSON.stringify({
+                            startTime: scheduled.scheduleStart,
+                            endTime:   scheduled.scheduleEnd || null
+                        }));
+
+                        enforceSchedule(startTime, endTime);
+                        return; // Done — backend wins
+                    }
+
+                    // If active quizzes exist but NONE have schedules → open quiz, no lockout
+                    if (quizzes.length > 0) {
+                        lockout.style.display = 'none';
+                        return;
+                    }
+                }
+            } catch (e) {
+                console.warn('[Schedule] Backend unreachable, falling back to localStorage:', e.message);
+            }
+
+            // ── 2. Fallback: check localStorage ─────────────────────
+            const saved = JSON.parse(localStorage.getItem(SCHED_KEY) || 'null');
+            if (!saved || !saved.startTime) {
+                lockout.style.display = 'none'; // No schedule anywhere → always open
+                return;
+            }
+
+            const startTime = new Date(saved.startTime);
+            const endTime   = saved.endTime ? new Date(saved.endTime) : null;
+            enforceSchedule(startTime, endTime);
+        }
+
+        init();
     })();
     </script>
+
 
 
     <!-- ===== LOBBY ===== -->
@@ -974,8 +1098,8 @@
             overlay.style.display = 'none';
         }
 
-        // ─── ROUND QUESTION BANK ─────────────────────────────────
-        const ROUNDS = {
+        // ─── ROUND QUESTION BANK (Fallback Defaults) ─────────────
+        let ROUNDS = {
             1: {
                 title: 'Cyber Awareness Fundamentals',
                 category: 'ROUND 01 // AWARENESS',

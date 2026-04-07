@@ -1,12 +1,32 @@
-const express = require('express');
-const router  = express.Router();
-const Quiz    = require('../models/Quiz');
+const express  = require('express');
+const router   = express.Router();
+const Quiz     = require('../models/Quiz');
 const Question = require('../models/Question');
-const Result  = require('../models/Result');
-const User    = require('../models/User');
-const Member  = require('../models/Member');
+const Result   = require('../models/Result');
+const User     = require('../models/User');
+const Member   = require('../models/Member');
 
-// ─── QUIZ CRUD ────────────────────────────────────────────────────────
+// ──────────────────────────────────────────────────────────────────────────────
+// QUIZ CRUD
+// ──────────────────────────────────────────────────────────────────────────────
+
+// GET all quizzes (admin sees all — drafts + active + archived)
+router.get('/quizzes', async (req, res) => {
+  try {
+    const quizzes = await Quiz.find().sort({ createdAt: -1 });
+    res.json(quizzes);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET a single quiz by ID
+router.get('/quizzes/:id', async (req, res) => {
+  try {
+    const quiz = await Quiz.findById(req.params.id);
+    if (!quiz) return res.status(404).json({ error: 'Quiz not found' });
+    res.json(quiz);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // CREATE Quiz
 router.post('/quizzes', async (req, res) => {
   try {
@@ -16,23 +36,20 @@ router.post('/quizzes', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// GET all quizzes (admin sees all, including drafts)
-router.get('/quizzes', async (req, res) => {
-  try {
-    const quizzes = await Quiz.find().sort({ createdAt: -1 });
-    res.json(quizzes);
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// UPDATE Quiz
+// UPDATE Quiz (full update)
 router.put('/quizzes/:id', async (req, res) => {
   try {
-    const quiz = await Quiz.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const quiz = await Quiz.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true, runValidators: true }
+    );
+    if (!quiz) return res.status(404).json({ error: 'Quiz not found' });
     res.json(quiz);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// DELETE Quiz
+// DELETE Quiz (also removes all its questions)
 router.delete('/quizzes/:id', async (req, res) => {
   try {
     await Quiz.findByIdAndDelete(req.params.id);
@@ -41,7 +58,19 @@ router.delete('/quizzes/:id', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ADD Question to Quiz
+// ──────────────────────────────────────────────────────────────────────────────
+// QUESTION CRUD (admin — includes correct answers for editing)
+// ──────────────────────────────────────────────────────────────────────────────
+
+// GET all questions for a quiz (admin view — includes correctAnswerIndex)
+router.get('/quizzes/:id/questions', async (req, res) => {
+  try {
+    const questions = await Question.find({ quizId: req.params.id }).sort({ createdAt: 1 });
+    res.json(questions);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ADD a single question to a quiz
 router.post('/quizzes/:id/questions', async (req, res) => {
   try {
     const q = new Question({ ...req.body, quizId: req.params.id });
@@ -50,82 +79,96 @@ router.post('/quizzes/:id/questions', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// POST bulk add rounds (from Excel upload)
+// UPDATE a single question
+router.put('/quizzes/:id/questions/:qid', async (req, res) => {
+  try {
+    const q = await Question.findByIdAndUpdate(req.params.qid, req.body, { new: true });
+    if (!q) return res.status(404).json({ error: 'Question not found' });
+    res.json(q);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// DELETE a single question
+router.delete('/quizzes/:id/questions/:qid', async (req, res) => {
+  try {
+    await Question.findByIdAndDelete(req.params.qid);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// BULK deploy rounds from Excel upload
 router.post('/quizzes/bulk', async (req, res) => {
   try {
     const { rounds } = req.body;
     if (!rounds) return res.status(400).json({ error: 'No rounds provided.' });
 
     for (const [roundName, questions] of Object.entries(rounds)) {
-      // Find or create quiz for this round
       const sanitizedName = roundName.trim();
       let quiz = await Quiz.findOne({ title: { $regex: new RegExp(`^${sanitizedName}$`, 'i') } });
       if (!quiz) {
         quiz = await Quiz.create({
-          title: sanitizedName,
-          category: sanitizedName.toLowerCase().replace(/[^a-z0-9]/g, ''),
-          durationMinutes: 30, // Default duration per round
-          status: 'active'
+          title:          sanitizedName,
+          category:       sanitizedName.toLowerCase().replace(/[^a-z0-9]/g, ''),
+          durationMinutes: 30,
+          status:         'active'
         });
       }
 
-      // Clear existing questions for this specific round (if it existed) to allow fresh deployments
+      // Wipe existing questions for this round to allow re-deploy
       await Question.deleteMany({ quizId: quiz._id });
 
-      // Build question docs
       const questionDocs = questions.map(q => {
         let correctAnswerIndex = 0;
         const ansMatch = String(q.answer).trim().toUpperCase();
-        if (ansMatch.startsWith('A)') || ansMatch.startsWith('A.')) correctAnswerIndex = 0;
+        if      (ansMatch.startsWith('A)') || ansMatch.startsWith('A.')) correctAnswerIndex = 0;
         else if (ansMatch.startsWith('B)') || ansMatch.startsWith('B.')) correctAnswerIndex = 1;
         else if (ansMatch.startsWith('C)') || ansMatch.startsWith('C.')) correctAnswerIndex = 2;
         else if (ansMatch.startsWith('D)') || ansMatch.startsWith('D.')) correctAnswerIndex = 3;
         else {
-          const optIdx = q.options.findIndex(o => String(o).trim().toLowerCase() === String(q.answer).trim().toLowerCase());
+          const optIdx = q.options.findIndex(o =>
+            String(o).trim().toLowerCase() === String(q.answer).trim().toLowerCase()
+          );
           if (optIdx !== -1) correctAnswerIndex = optIdx;
         }
-
         return {
-          quizId: quiz._id,
-          questionText: q.question,
-          options: q.options,
-          correctAnswerIndex: correctAnswerIndex,
-          difficulty: 'Medium'
+          quizId:             quiz._id,
+          questionText:       q.question,
+          options:            q.options,
+          correctAnswerIndex,
+          difficulty:         'Medium'
         };
       });
 
-      // Bulk insert
-      if (questionDocs.length > 0) {
-        await Question.insertMany(questionDocs);
-      }
+      if (questionDocs.length > 0) await Question.insertMany(questionDocs);
     }
 
     res.json({ success: true, message: 'Rounds deployed successfully!' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ─── QUIZ RESULTS ─────────────────────────────────────────────────────
-// GET all results (for admin Quiz Results & Overview)
+// ──────────────────────────────────────────────────────────────────────────────
+// QUIZ RESULTS
+// ──────────────────────────────────────────────────────────────────────────────
+
+// GET all results
 router.get('/results', async (req, res) => {
   try {
     const results = await Result.find()
-      .populate('userId', 'name email department')
-      .populate('quizId', 'title category')
+      .populate('userId',  'name email department')
+      .populate('quizId',  'title category')
       .sort({ createdAt: -1 });
     res.json(results);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// POST a quiz result (from quiz.html via anonymous/guest submission)
+// POST a quiz result
 router.post('/results', async (req, res) => {
   try {
     const { quizKey, quizTitle, score, totalQuestions, timeTaken, violations, autoSubmitted, playerName } = req.body;
 
-    // Find quiz by category key, or create a guest user on the fly
     let quiz = await Quiz.findOne({ category: quizKey });
     if (!quiz) return res.status(404).json({ error: 'Quiz not found' });
 
-    // Find or create a "Guest" user for anonymous submissions
     let user = await User.findOne({ email: `${playerName || 'guest'}@guest.cssc` });
     if (!user) {
       user = await User.create({
@@ -148,8 +191,10 @@ router.post('/results', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ─── MEMBERS ──────────────────────────────────────────────────────────
-// GET all club members
+// ──────────────────────────────────────────────────────────────────────────────
+// MEMBERS
+// ──────────────────────────────────────────────────────────────────────────────
+
 router.get('/members', async (req, res) => {
   try {
     const members = await Member.find().sort({ createdAt: -1 });
@@ -157,7 +202,6 @@ router.get('/members', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// POST add new member
 router.post('/members', async (req, res) => {
   try {
     const member = new Member(req.body);
@@ -166,7 +210,6 @@ router.post('/members', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// DELETE member
 router.delete('/members/:id', async (req, res) => {
   try {
     await Member.findByIdAndDelete(req.params.id);
@@ -174,7 +217,10 @@ router.delete('/members/:id', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ─── DASHBOARD STATS ──────────────────────────────────────────────────
+// ──────────────────────────────────────────────────────────────────────────────
+// DASHBOARD STATS
+// ──────────────────────────────────────────────────────────────────────────────
+
 router.get('/stats', async (req, res) => {
   try {
     const [totalMembers, totalResults, violations, quizzes] = await Promise.all([
@@ -184,24 +230,15 @@ router.get('/stats', async (req, res) => {
       Quiz.countDocuments({ status: 'active' })
     ]);
 
-    // Recent activity: last 10 results
     const recentResults = await Result.find()
       .populate('userId', 'name department')
       .populate('quizId', 'title')
       .sort({ createdAt: -1 })
       .limit(10);
 
-    // Recent members: last 5
     const recentMembers = await Member.find().sort({ createdAt: -1 }).limit(5);
 
-    res.json({
-      totalMembers,
-      totalResults,
-      violations,
-      activeQuizzes: quizzes,
-      recentResults,
-      recentMembers
-    });
+    res.json({ totalMembers, totalResults, violations, activeQuizzes: quizzes, recentResults, recentMembers });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

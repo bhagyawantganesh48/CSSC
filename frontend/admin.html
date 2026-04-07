@@ -501,7 +501,7 @@
             </div>
             <div class="cssc-modal-actions" style="margin-top:24px;">
                 <button class="cssc-modal-cancel" onclick="document.getElementById('q-modal').classList.remove('show')">Discard</button>
-                <button class="cssc-modal-confirm" onclick="saveNewQuestion()">💾 Save to Bank</button>
+                <button class="cssc-modal-confirm" id="q-modal-save-btn" onclick="saveNewQuestion()">💾 Save to Draft</button>
             </div>
         </div>
     </div>
@@ -728,11 +728,21 @@
                 <!-- QUIZ MANAGEMENT (BUILDER) SECTION -->
                 <div id="section-quiz-mgmt" style="display:none;">
                     <div class="panel-section">
+                        <!-- Quiz Selector Bar -->
+                        <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;padding:16px 20px;background:rgba(0,212,255,0.04);border:1px solid rgba(0,212,255,0.15);border-radius:14px;flex-wrap:wrap;">
+                            <div style="font-family:var(--font-mono);font-size:0.65rem;letter-spacing:2px;color:var(--neon-blue);white-space:nowrap;">QUIZ EDITOR</div>
+                            <select id="quiz-selector" class="builder-select" style="flex:1;min-width:200px;" onchange="loadQuizForEditing(this.value)">
+                                <option value="new">➕ Create New Quiz</option>
+                            </select>
+                            <button class="btn-sm secondary" style="padding:8px 16px;white-space:nowrap;" onclick="refreshQuizList()">🔄 Refresh</button>
+                            <div id="quiz-save-status" style="font-family:var(--font-mono);font-size:0.65rem;letter-spacing:1px;color:var(--neon-green);display:none;">✅ SAVED</div>
+                        </div>
+
                         <div class="panel-section-header">
                             <h2>🧩 Advanced Quiz Builder</h2>
                             <div class="table-actions">
-                                <button class="btn-sm secondary">Discard Draft</button>
-                                <button class="btn-sm primary">💾 Save & Deploy Quiz</button>
+                                <button id="discard-draft-btn" class="btn-sm secondary" onclick="discardDraft()">Discard Draft</button>
+                                <button id="save-deploy-btn" class="btn-sm primary" onclick="saveAndDeployQuiz()">💾 Save & Deploy Quiz</button>
                             </div>
                         </div>
 
@@ -742,7 +752,7 @@
                                 <button class="builder-tab active" data-b-tab="general">📝 1. General Settings</button>
                                 <button class="builder-tab" data-b-tab="questions">❓ 2. Questions</button>
                                 <button class="builder-tab" data-b-tab="behavior">🔀 3. Quiz Behavior</button>
-                                <button class="builder-tab" data-b-tab="timer">⏳ 4. Timer & Rules</button>
+                                <button class="builder-tab" data-b-tab="timer">⏳ 4. Timer &amp; Rules</button>
                                 <button class="builder-tab" data-b-tab="anticheat">🚨 5. Anti-Cheat Engine</button>
                                 <button class="builder-tab" data-b-tab="access">🔐 6. Access Control</button>
                                 <button class="builder-tab" data-b-tab="cert">🧾 7. Certificates (Pro)</button>
@@ -757,33 +767,45 @@
                                     <div class="form-grid full">
                                         <div class="form-group">
                                             <label>Quiz Title</label>
-                                            <input type="text" class="builder-input" placeholder="e.g. Cyber Security Mid-Term" />
+                                            <input type="text" id="gs-title" class="builder-input" placeholder="e.g. Cyber Security Mid-Term" />
                                         </div>
                                     </div>
                                     <div class="form-grid">
                                         <div class="form-group">
-                                            <label>Category</label>
-                                            <select class="builder-select">
-                                                <option>Information Security</option>
-                                                <option>Network Defense</option>
-                                                <option>Ethical Hacking</option>
-                                            </select>
+                                            <label>Category (used as URL key)</label>
+                                            <input type="text" id="gs-category" class="builder-input" placeholder="e.g. infosec-midterm" />
+                                            <div style="font-family:var(--font-mono);font-size:0.6rem;color:var(--text-muted);margin-top:4px;">Lowercase, no spaces. Used to identify this quiz.</div>
                                         </div>
                                         <div class="form-group">
                                             <label>Difficulty Tier</label>
-                                            <select class="builder-select">
+                                            <select id="gs-difficulty" class="builder-select">
                                                 <option>Beginner (Recruit)</option>
                                                 <option>Intermediate (Field Agent)</option>
                                                 <option>Advanced (Elite Operator)</option>
                                             </select>
                                         </div>
                                     </div>
+                                    <div class="form-grid">
+                                        <div class="form-group">
+                                            <label>Quiz Status</label>
+                                            <select id="gs-status" class="builder-select">
+                                                <option value="draft">📝 Draft (hidden from students)</option>
+                                                <option value="active">✅ Active (visible in lobby)</option>
+                                                <option value="archived">📦 Archived</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Duration (Minutes)</label>
+                                            <input type="number" id="gs-duration" class="builder-input" value="10" min="1" />
+                                        </div>
+                                    </div>
                                     <div class="form-grid full">
                                         <div class="form-group">
                                             <label>Public Description</label>
-                                            <textarea class="builder-textarea" placeholder="Briefly describe what this assessment covers..."></textarea>
+                                            <textarea id="gs-description" class="builder-textarea" placeholder="Briefly describe what this assessment covers..."></textarea>
                                         </div>
                                     </div>
+                                    <div id="gs-save-indicator" style="display:none;margin-top:8px;padding:10px 14px;border-radius:8px;font-family:var(--font-mono);font-size:0.72rem;letter-spacing:1px;"></div>
                                 </div>
 
                                 <!-- QUESTIONS -->
@@ -837,50 +859,51 @@
                                                 <div class="setting-info-title">Shuffle Questions Pool</div>
                                                 <div class="setting-info-desc">Randomizes the order of the questions for every student.</div>
                                             </div>
-                                            <label class="cssc-switch"><input type="checkbox" checked><span class="cssc-slider"></span></label>
+                                            <label class="cssc-switch"><input type="checkbox" id="beh-shuffle-q" checked><span class="cssc-slider"></span></label>
                                         </div>
                                         <div class="setting-item">
                                             <div>
                                                 <div class="setting-info-title">Shuffle Options (A/B/C/D)</div>
                                                 <div class="setting-info-desc">Randomizes the internal choices for multiple choice questions.</div>
                                             </div>
-                                            <label class="cssc-switch"><input type="checkbox" checked><span class="cssc-slider"></span></label>
+                                            <label class="cssc-switch"><input type="checkbox" id="beh-shuffle-opts" checked><span class="cssc-slider"></span></label>
                                         </div>
                                         <div class="setting-item">
                                             <div>
                                                 <div class="setting-info-title">One Question At A Time</div>
                                                 <div class="setting-info-desc">Forces the student to focus on singular questions instead of a scrolling sheet.</div>
                                             </div>
-                                            <label class="cssc-switch"><input type="checkbox" checked><span class="cssc-slider"></span></label>
+                                            <label class="cssc-switch"><input type="checkbox" id="beh-one-at-a-time" checked><span class="cssc-slider"></span></label>
                                         </div>
                                         <div class="setting-item">
                                             <div>
                                                 <div class="setting-info-title">Allow Back Navigation</div>
                                                 <div class="setting-info-desc">Lets students review previously answered questions. (Disable for strict exams).</div>
                                             </div>
-                                            <label class="cssc-switch"><input type="checkbox"><span class="cssc-slider"></span></label>
+                                            <label class="cssc-switch"><input type="checkbox" id="beh-allow-back"><span class="cssc-slider"></span></label>
                                         </div>
                                         <div class="setting-item">
                                             <div>
                                                 <div class="setting-info-title">Max Questions Displayed</div>
-                                                <div class="setting-info-desc">E.g. Draw a random 10 questions from a larger 50-question pool. (0 = Show All)</div>
+                                                <div class="setting-info-desc">Draw a random N questions from larger pool. (0 = Show All)</div>
                                             </div>
-                                            <input type="number" class="builder-input" style="width:80px; text-align:center;" value="10" />
+                                            <input type="number" id="beh-max-display" class="builder-input" style="width:80px; text-align:center;" value="0" min="0" />
                                         </div>
                                     </div>
                                 </div>
 
                                 <!-- TIMER & RULES -->
                                 <div class="builder-section" id="b-tab-timer">
-                                    <h3 style="margin-bottom:24px; color:var(--neon-blue);">⏳ Timer & Rules Control</h3>
+                                    <h3 style="margin-bottom:24px; color:var(--neon-blue);">⏳ Timer &amp; Rules Control</h3>
                                     <div class="form-grid">
                                         <div class="form-group">
                                             <label>Total Exam Duration (Minutes)</label>
-                                            <input type="number" class="builder-input" value="10" />
+                                            <input type="number" id="tmr-duration" class="builder-input" value="10" min="1" />
+                                            <div style="font-family:var(--font-mono);font-size:0.6rem;color:var(--text-muted);margin-top:4px;">Also configurable in GeneralSettings.</div>
                                         </div>
                                         <div class="form-group">
                                             <label>Per-Question Timer (Seconds)</label>
-                                            <input type="number" class="builder-input" placeholder="0 = Disabled" />
+                                            <input type="number" id="tmr-per-question" class="builder-input" placeholder="0 = Disabled" value="0" min="0" />
                                         </div>
                                     </div>
                                     <div class="settings-list" style="margin-top:24px;">
@@ -889,53 +912,53 @@
                                                 <div class="setting-info-title" style="color:#ff4757;">Strict Time Submit Protocol</div>
                                                 <div class="setting-info-desc">Automatically submits the exam instantly when the time hits 00:00.</div>
                                             </div>
-                                            <label class="cssc-switch"><input type="checkbox" checked><span class="cssc-slider"></span></label>
+                                            <label class="cssc-switch"><input type="checkbox" id="tmr-strict-submit" checked><span class="cssc-slider"></span></label>
                                         </div>
                                     </div>
                                 </div>
 
                                 <!-- ANTI-CHEAT -->
                                 <div class="builder-section" id="b-tab-anticheat">
-                                    <h3 style="margin-bottom:24px; color:var(--neon-green);">🚨 Anti-Cheat Settings (Pro)</h3>
+                                    <h3 style="margin-bottom:24px; color:var(--neon-green);">🚨 Anti-Cheat Settings</h3>
                                     <div class="settings-list">
                                         <div class="setting-item" style="border-color:rgba(0,255,136,0.3);">
                                             <div>
                                                 <div class="setting-info-title" style="color:var(--neon-green);">Hardware: Fullscreen Enforcement</div>
                                                 <div class="setting-info-desc">Requires exclusive fullscreen. Logs a violation if user exits fullscreen.</div>
                                             </div>
-                                            <label class="cssc-switch"><input type="checkbox" checked><span class="cssc-slider"></span></label>
+                                            <label class="cssc-switch"><input type="checkbox" id="ac-fullscreen" checked><span class="cssc-slider"></span></label>
                                         </div>
                                         <div class="setting-item" style="border-color:rgba(0,255,136,0.3);">
                                             <div>
-                                                <div class="setting-info-title" style="color:var(--neon-green);">System: Window Blur & Tab Switch</div>
+                                                <div class="setting-info-title" style="color:var(--neon-green);">System: Window Blur &amp; Tab Switch</div>
                                                 <div class="setting-info-desc">Detects if the user switches browser tabs or opens another application.</div>
                                             </div>
-                                            <label class="cssc-switch"><input type="checkbox" checked><span class="cssc-slider"></span></label>
+                                            <label class="cssc-switch"><input type="checkbox" id="ac-tab-switch" checked><span class="cssc-slider"></span></label>
                                         </div>
                                         <div class="setting-item">
                                             <div>
                                                 <div class="setting-info-title">Action: Disable Right-Click</div>
                                                 <div class="setting-info-desc">Blocks context menus logically.</div>
                                             </div>
-                                            <label class="cssc-switch"><input type="checkbox" checked><span class="cssc-slider"></span></label>
+                                            <label class="cssc-switch"><input type="checkbox" id="ac-right-click" checked><span class="cssc-slider"></span></label>
                                         </div>
                                         <div class="setting-item">
                                             <div>
                                                 <div class="setting-info-title">Action: Disable Copy/Paste Data</div>
                                                 <div class="setting-info-desc">Blocks Ctrl+C, Ctrl+V, and clipboard API integrations.</div>
                                             </div>
-                                            <label class="cssc-switch"><input type="checkbox" checked><span class="cssc-slider"></span></label>
+                                            <label class="cssc-switch"><input type="checkbox" id="ac-copy-paste" checked><span class="cssc-slider"></span></label>
                                         </div>
                                         <div class="setting-item" style="border-color:rgba(255,71,87,0.3);">
                                             <div>
                                                 <div class="setting-info-title" style="color:#ff4757;">Execution: Max Warning Limit</div>
-                                                <div class="setting-info-desc">How many violations the user receives before automatic submission.</div>
+                                                <div class="setting-info-desc">How many violations the user receives before automatic submission. (-1 = Disabled)</div>
                                             </div>
-                                            <select class="builder-select" style="width:120px;">
-                                                <option>1 Strike</option>
-                                                <option>2 Strikes</option>
-                                                <option selected>3 Strikes</option>
-                                                <option>Disabled</option>
+                                            <select id="ac-max-warnings" class="builder-select" style="width:140px;">
+                                                <option value="1">1 Strike</option>
+                                                <option value="2">2 Strikes</option>
+                                                <option value="3" selected>3 Strikes</option>
+                                                <option value="-1">Disabled</option>
                                             </select>
                                         </div>
                                     </div>
@@ -987,42 +1010,42 @@
                                                 <div class="setting-info-title">Limit Total Attempts</div>
                                                 <div class="setting-info-desc">Restricts how many times a single user can start this quiz.</div>
                                             </div>
-                                            <input type="number" class="builder-input" style="width:80px; text-align:center;" value="1" />
+                                            <input type="number" id="acc-max-attempts" class="builder-input" style="width:80px; text-align:center;" value="1" min="1" />
                                         </div>
                                         <div class="setting-item">
                                             <div>
                                                 <div class="setting-info-title">Private Access Code</div>
-                                                <div class="setting-info-desc">Require a specific password for entrance.</div>
+                                                <div class="setting-info-desc">Require a specific password for entrance. (Leave blank = open)</div>
                                             </div>
-                                            <input type="text" class="builder-input" style="width:160px;" placeholder="Optional..." />
+                                            <input type="text" id="acc-access-code" class="builder-input" style="width:160px;" placeholder="Optional..." />
                                         </div>
                                     </div>
                                 </div>
                                 
                                 <!-- CERTIFICATES & RESULTS -->
                                 <div class="builder-section" id="b-tab-cert">
-                                    <h3 style="margin-bottom:24px; color:var(--neon-blue);">🧾 Certifications & Pass Criteria</h3>
+                                    <h3 style="margin-bottom:24px; color:var(--neon-blue);">🧾 Certifications &amp; Pass Criteria</h3>
                                     <div class="settings-list">
                                         <div class="setting-item">
                                             <div>
                                                 <div class="setting-info-title">Auto-Generate Certificate upon Passing</div>
                                                 <div class="setting-info-desc">Generates a branded PDF for the user if they meet the passing threshold.</div>
                                             </div>
-                                            <label class="cssc-switch"><input type="checkbox" checked><span class="cssc-slider"></span></label>
+                                            <label class="cssc-switch"><input type="checkbox" id="cert-auto-gen" checked><span class="cssc-slider"></span></label>
                                         </div>
                                         <div class="setting-item">
                                             <div>
                                                 <div class="setting-info-title">Minimum Passing Score (%)</div>
                                                 <div class="setting-info-desc">Numerical threshold required to display "Passed".</div>
                                             </div>
-                                            <input type="number" class="builder-input" style="width:80px; text-align:center;" value="80" />
+                                            <input type="number" id="cert-pass-score" class="builder-input" style="width:80px; text-align:center;" value="80" min="0" max="100" />
                                         </div>
                                         <div class="setting-item">
                                             <div>
                                                 <div class="setting-info-title">Display Detailed Analytics to User</div>
                                                 <div class="setting-info-desc">Show correct/incorrect logs when finished vs just giving the final score.</div>
                                             </div>
-                                            <label class="cssc-switch"><input type="checkbox" checked><span class="cssc-slider"></span></label>
+                                            <label class="cssc-switch"><input type="checkbox" id="cert-show-analytics" checked><span class="cssc-slider"></span></label>
                                         </div>
                                     </div>
                                 </div>
@@ -1036,7 +1059,7 @@
                                                 <div class="setting-info-title">Visual Theme Mode</div>
                                                 <div class="setting-info-desc">Force the exam interface to be dark or light mode, or let the system follow OS.</div>
                                             </div>
-                                            <select class="builder-select" style="width: 160px;">
+                                            <select id="ui-theme" class="builder-select" style="width: 180px;">
                                                 <option>Dark Mode (CSSC)</option>
                                                 <option>Light Mode</option>
                                                 <option>Follow OS System</option>
@@ -1047,14 +1070,14 @@
                                                 <div class="setting-info-title">Show Live Progress Bar</div>
                                                 <div class="setting-info-desc">Displays a visual status bar indicating current completion percentage.</div>
                                             </div>
-                                            <label class="cssc-switch"><input type="checkbox" checked><span class="cssc-slider"></span></label>
+                                            <label class="cssc-switch"><input type="checkbox" id="ui-progress-bar" checked><span class="cssc-slider"></span></label>
                                         </div>
                                         <div class="setting-item">
                                             <div>
                                                 <div class="setting-info-title">Show Question Numbers</div>
                                                 <div class="setting-info-desc">Reveals "Question 1 of 50" above the cards.</div>
                                             </div>
-                                            <label class="cssc-switch"><input type="checkbox" checked><span class="cssc-slider"></span></label>
+                                            <label class="cssc-switch"><input type="checkbox" id="ui-show-numbers" checked><span class="cssc-slider"></span></label>
                                         </div>
                                     </div>
                                 </div>
@@ -1410,6 +1433,8 @@
             updateDashboardStats();
             updateLaunchCountdown();
             loadScheduleState();
+            // Pre-load quiz list for the builder selector
+            setTimeout(() => { if (typeof refreshQuizList === 'function') refreshQuizList(); }, 100);
         }
 
         // ─── Sidebar Navigation ──────────────────────────────────
@@ -1427,10 +1452,12 @@
                     'coding-arena': 'Coding Arena Management'  /* CODING ARENA ADDITION */
                 }[section] || 'Overview';
 
-                document.getElementById('section-overview').style.display = section === 'overview' ? 'block' : 'none';
-                document.getElementById('section-quiz-mgmt').style.display = section === 'quiz-mgmt' ? 'block' : 'none';
-                document.getElementById('section-members').style.display = section === 'members' ? 'block' : 'none';
-                document.getElementById('section-quiz').style.display = section === 'quiz' ? 'block' : 'none';
+                document.getElementById('section-overview').style.display    = section === 'overview'      ? 'block' : 'none';
+                document.getElementById('section-quiz-mgmt').style.display   = section === 'quiz-mgmt'     ? 'block' : 'none';
+                document.getElementById('section-members').style.display     = section === 'members'       ? 'block' : 'none';
+                document.getElementById('section-quiz').style.display        = section === 'quiz'           ? 'block' : 'none';
+                // Refresh quiz list when entering builder
+                if (section === 'quiz-mgmt' && typeof refreshQuizList === 'function') refreshQuizList();
                 /* CODING ARENA ADDITION */
                 const caSection = document.getElementById('section-coding-arena');
                 if (caSection) caSection.style.display = section === 'coding-arena' ? 'block' : 'none';
@@ -1541,6 +1568,7 @@
         // ─── Quiz Schedule ────────────────────────────────────────
 
         function loadScheduleState() {
+            const SCHED_KEY = 'cssc_quiz_schedule';
             const saved = JSON.parse(localStorage.getItem(SCHED_KEY) || 'null');
             const startEl = document.getElementById('quiz-start-time');
             const endEl   = document.getElementById('quiz-end-time');
@@ -1608,53 +1636,81 @@
             }
         }
 
-        window.saveQuizSchedule = function () {
-            const startVal = document.getElementById('quiz-start-time')?.value;
-            const endVal   = document.getElementById('quiz-end-time')?.value;
-            const msgEl    = document.getElementById('schedule-save-msg');
-
-            if (!startVal) {
-                msgEl.textContent = '⚠️  Please set a quiz open time first.';
-                msgEl.style.background = 'rgba(255,71,87,0.08)';
-                msgEl.style.border     = '1px solid rgba(255,71,87,0.3)';
-                msgEl.style.color      = '#ff4757';
-                msgEl.style.display    = 'block';
-                return;
-            }
-            if (endVal && new Date(endVal) <= new Date(startVal)) {
-                msgEl.textContent = '⚠️  Close time must be after open time.';
-                msgEl.style.background = 'rgba(255,71,87,0.08)';
-                msgEl.style.border     = '1px solid rgba(255,71,87,0.3)';
-                msgEl.style.color      = '#ff4757';
-                msgEl.style.display    = 'block';
-                return;
+        window.saveQuizSchedule = async function () {
+            // First check if Title is filled
+            const title = (document.getElementById('gs-title')?.value || '').trim();
+            if (!title) {
+                 showModal({ 
+                     icon: '⚠️', 
+                     title: 'No Quiz Selected', 
+                     msg: 'You are currently on a blank "New Quiz" template. To change the schedule of an existing quiz, please select it from the dropdown at the top of the page first! Otherwise, provide a Quiz Title in General Settings.', 
+                     confirmText: 'Got It' 
+                 });
+                 document.querySelectorAll('.builder-tab').forEach(t => t.classList.remove('active'));
+                 document.querySelectorAll('.builder-section').forEach(s => s.classList.remove('active'));
+                 document.querySelector('[data-b-tab=general]').classList.add('active');
+                 document.getElementById('b-tab-general').classList.add('active');
+                 return;
             }
 
-            localStorage.setItem(SCHED_KEY, JSON.stringify({ startTime: startVal, endTime: endVal || null }));
+            // Force status to "active" so the schedule is broadcast to the public lobby
+            const statusEl = document.getElementById('gs-status');
+            if (statusEl && statusEl.value !== 'active') {
+                statusEl.value = 'active';
+            }
 
-            msgEl.textContent = '✅ Schedule saved! Students will see a countdown on quiz.html.';
-            msgEl.style.background = 'rgba(0,255,136,0.07)';
-            msgEl.style.border     = '1px solid rgba(0,255,136,0.3)';
-            msgEl.style.color      = 'var(--neon-green)';
-            msgEl.style.display    = 'block';
-            setTimeout(() => msgEl.style.display = 'none', 4000);
-            loadScheduleState();
+            const btn = document.querySelector('button[onclick="saveQuizSchedule()"]');
+            if (btn) btn.textContent = '⏳ Saving...';
+            
+            // Trigger the main save process so it writes to MongoDB
+            if (typeof saveAndDeployQuiz === 'function') {
+                const success = await saveAndDeployQuiz();
+                if (success === false) {
+                    if (btn) btn.innerHTML = '💾 Save Schedule';
+                    return; // Validation failed
+                }
+            }
+
+            const msgEl = document.getElementById('schedule-save-msg');
+            if (msgEl) {
+                msgEl.style.display = 'block';
+                msgEl.style.background = 'rgba(0,255,136,0.1)';
+                msgEl.style.color = 'var(--neon-green)';
+                msgEl.textContent = '✓ Schedule saved and quiz deployed as Active!';
+                setTimeout(() => msgEl.style.display = 'none', 3000);
+            }
+            if (btn) btn.innerHTML = '💾 Save Schedule';
+
+            // Sync the local UI badge to prove to the user it was saved
+            const startDt = document.getElementById('quiz-start-time')?.value;
+            const endDt   = document.getElementById('quiz-end-time')?.value;
+            if (startDt) {
+                localStorage.setItem('cssc_quiz_schedule', JSON.stringify({
+                    startTime: startDt,
+                    endTime:   endDt || null
+                }));
+                if (typeof loadScheduleState === 'function') loadScheduleState();
+            }
         };
 
-        window.clearQuizSchedule = function () {
-            localStorage.removeItem(SCHED_KEY);
-            const startEl = document.getElementById('quiz-start-time');
-            const endEl   = document.getElementById('quiz-end-time');
-            if (startEl) startEl.value = '';
-            if (endEl)   endEl.value   = '';
+        window.clearQuizSchedule = async function () {
+            document.getElementById('quiz-start-time').value = '';
+            document.getElementById('quiz-end-time').value = '';
+            
+            const btn = document.querySelector('button[onclick="clearQuizSchedule()"]');
+            if (btn) btn.textContent = '⏳ Clearing...';
+
+            if (typeof saveAndDeployQuiz === 'function') await saveAndDeployQuiz();
+
             const msgEl = document.getElementById('schedule-save-msg');
-            msgEl.textContent = '🗑 Schedule cleared. Quiz is now always open.';
-            msgEl.style.background = 'rgba(255,159,67,0.07)';
-            msgEl.style.border     = '1px solid rgba(255,159,67,0.3)';
-            msgEl.style.color      = '#ff9f43';
-            msgEl.style.display    = 'block';
-            setTimeout(() => msgEl.style.display = 'none', 4000);
-            loadScheduleState();
+            if (msgEl) {
+                msgEl.style.display = 'block';
+                msgEl.style.background = 'rgba(255,71,87,0.1)';
+                msgEl.style.color = '#ff4757';
+                msgEl.textContent = '🗑 Schedule cleared. Quiz is now always open.';
+                setTimeout(() => msgEl.style.display = 'none', 3000);
+            }
+            if (btn) btn.innerHTML = '🗑 Clear Schedule';
         };
 
         // ─── Export CSV ──────────────────────────────────────────
@@ -1745,37 +1801,390 @@
             }
         }
 
-        // ─── Quiz Features: Add Question To UI ────────────────────
-        function saveNewQuestion() {
-            const prompt = document.getElementById('q-prompt').value;
-            if(!prompt) return alert('Enter a prompt!');
-            
-            const emptyState = document.getElementById('empty-q-state');
-            if(emptyState) emptyState.style.display = 'none';
+        // ─── Quiz Builder Engine ───────────────────────────────────────────
+        const API = 'http://localhost:5003/api';
+        let currentQuizId = null;   // null = creating new
+        let draftQuestions = [];    // questions staged for current draft
+        let editingQIndex  = null;  // index in draftQuestions being edited
 
-            const diff = document.getElementById('q-diff').value;
-            const container = document.getElementById('questions-list-container');
-            const qDiv = document.createElement('div');
-            qDiv.className = 'setting-item';
-            qDiv.innerHTML = `
-                <div>
-                    <div class="setting-info-title">${prompt}</div>
-                    <div class="setting-info-desc">Level: <span style="color:var(--neon-blue);">${diff}</span></div>
-                </div>
-                <div class="table-actions">
-                    <button class="table-action-btn edit" onclick="document.getElementById('q-modal').classList.add('show')">✏️ Edit</button>
-                    <button class="table-action-btn danger" onclick="this.parentElement.parentElement.remove()">🗑️ Delete</button>
-                </div>
-            `;
-            container.appendChild(qDiv);
-            
-            document.getElementById('q-modal').classList.remove('show');
-            showModal('✅', 'Question Bank Updated', 'Successfully appended question strictly to local draft pool.', 'Awesome');
+        // Show inline status message
+        function showBuilderMsg(elId, type, msg, autohide = 4000) {
+            const el = document.getElementById(elId);
+            if (!el) return;
+            el.style.display = 'block';
+            el.style.background = type === 'success' ? 'rgba(0,255,136,0.07)' : 'rgba(255,71,87,0.07)';
+            el.style.border     = type === 'success' ? '1px solid rgba(0,255,136,0.3)' : '1px solid rgba(255,71,87,0.3)';
+            el.style.color      = type === 'success' ? 'var(--neon-green)' : '#ff4757';
+            el.textContent      = msg;
+            if (autohide) setTimeout(() => el.style.display = 'none', autohide);
         }
 
-        let parsedRoundsData = {};
+        // ── Collect all form values into a quiz object ──────────────
+        function collectBuilderData() {
+            const title    = (document.getElementById('gs-title')?.value || '').trim();
+            const category = (document.getElementById('gs-category')?.value || '').trim().toLowerCase().replace(/\s+/g, '-');
+            const duration = parseInt(document.getElementById('gs-duration')?.value || '10');
+            const status   = document.getElementById('gs-status')?.value || 'draft';
+            const timerDuration = parseInt(document.getElementById('tmr-duration')?.value || duration);
 
-        // Expose to window for inline onclick execution
+            return {
+                title,
+                description:    document.getElementById('gs-description')?.value || '',
+                category:       category || title.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-'),
+                difficultyTier: document.getElementById('gs-difficulty')?.value || 'Beginner (Recruit)',
+                durationMinutes: duration || timerDuration,
+                status,
+                scheduleStart:  document.getElementById('quiz-start-time')?.value || null,
+                scheduleEnd:    document.getElementById('quiz-end-time')?.value || null,
+                maxAttempts:    parseInt(document.getElementById('acc-max-attempts')?.value || '1'),
+                accessCode:     document.getElementById('acc-access-code')?.value || '',
+                settings: {
+                    shuffleQuestions:     document.getElementById('beh-shuffle-q')?.checked ?? true,
+                    shuffleOptions:       document.getElementById('beh-shuffle-opts')?.checked ?? true,
+                    oneQuestionAtATime:   document.getElementById('beh-one-at-a-time')?.checked ?? true,
+                    allowBackNav:         document.getElementById('beh-allow-back')?.checked ?? false,
+                    maxQuestionsDisplay:  parseInt(document.getElementById('beh-max-display')?.value || '0'),
+                    perQuestionTimerSec:  parseInt(document.getElementById('tmr-per-question')?.value || '0'),
+                    strictTimeSubmit:     document.getElementById('tmr-strict-submit')?.checked ?? true,
+                    enforceFullscreen:    document.getElementById('ac-fullscreen')?.checked ?? true,
+                    detectTabSwitch:      document.getElementById('ac-tab-switch')?.checked ?? true,
+                    disableRightClick:    document.getElementById('ac-right-click')?.checked ?? true,
+                    disableCopyPaste:     document.getElementById('ac-copy-paste')?.checked ?? true,
+                    maxViolations:        parseInt(document.getElementById('ac-max-warnings')?.value || '3'),
+                    autoGenerateCert:     document.getElementById('cert-auto-gen')?.checked ?? true,
+                    passingScorePercent:  parseInt(document.getElementById('cert-pass-score')?.value || '80'),
+                    showDetailedAnalytics: document.getElementById('cert-show-analytics')?.checked ?? true,
+                    uiTheme:             document.getElementById('ui-theme')?.value || 'Dark Mode (CSSC)',
+                    showProgressBar:     document.getElementById('ui-progress-bar')?.checked ?? true,
+                    showQuestionNumbers: document.getElementById('ui-show-numbers')?.checked ?? true,
+                }
+            };
+        }
+
+        // ── Populate form fields from a quiz object ──────────────────
+        function populateBuilderForm(quiz) {
+            const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val ?? ''; };
+            const chk = (id, val) => { const el = document.getElementById(id); if (el) el.checked = !!val; };
+            const sel = (id, val) => { const el = document.getElementById(id); if (el && val !== undefined) el.value = val; };
+
+            set('gs-title',       quiz.title);
+            set('gs-category',    quiz.category);
+            sel('gs-difficulty',  quiz.difficultyTier);
+            sel('gs-status',      quiz.status);
+            set('gs-duration',    quiz.durationMinutes);
+            set('gs-description', quiz.description);
+
+            // Access Control
+            set('quiz-start-time', quiz.scheduleStart ? new Date(quiz.scheduleStart).toISOString().slice(0,16) : '');
+            set('quiz-end-time',   quiz.scheduleEnd   ? new Date(quiz.scheduleEnd).toISOString().slice(0,16)   : '');
+            set('acc-max-attempts', quiz.maxAttempts ?? 1);
+            set('acc-access-code',  quiz.accessCode   ?? '');
+
+            const s = quiz.settings || {};
+            // Behavior
+            chk('beh-shuffle-q',    s.shuffleQuestions    ?? true);
+            chk('beh-shuffle-opts', s.shuffleOptions      ?? true);
+            chk('beh-one-at-a-time',s.oneQuestionAtATime  ?? true);
+            chk('beh-allow-back',   s.allowBackNav        ?? false);
+            set('beh-max-display',  s.maxQuestionsDisplay ?? 0);
+            // Timer
+            set('tmr-duration',     quiz.durationMinutes  ?? 10);
+            set('tmr-per-question', s.perQuestionTimerSec ?? 0);
+            chk('tmr-strict-submit',s.strictTimeSubmit    ?? true);
+            // Anti-Cheat
+            chk('ac-fullscreen',    s.enforceFullscreen   ?? true);
+            chk('ac-tab-switch',    s.detectTabSwitch     ?? true);
+            chk('ac-right-click',   s.disableRightClick   ?? true);
+            chk('ac-copy-paste',    s.disableCopyPaste    ?? true);
+            sel('ac-max-warnings',  String(s.maxViolations ?? 3));
+            // Certs
+            chk('cert-auto-gen',       s.autoGenerateCert     ?? true);
+            set('cert-pass-score',     s.passingScorePercent  ?? 80);
+            chk('cert-show-analytics', s.showDetailedAnalytics ?? true);
+            // UI
+            sel('ui-theme',        s.uiTheme              ?? 'Dark Mode (CSSC)');
+            chk('ui-progress-bar', s.showProgressBar      ?? true);
+            chk('ui-show-numbers', s.showQuestionNumbers  ?? true);
+        }
+
+        // ── Refresh quiz list in the selector ────────────────────────
+        window.refreshQuizList = async function() {
+            try {
+                const res  = await fetch(`${API}/admin/quizzes`);
+                const data = await res.json();
+                const sel  = document.getElementById('quiz-selector');
+                const prevVal = sel.value;
+                sel.innerHTML = '<option value="new">➕ Create New Quiz</option>';
+                (Array.isArray(data) ? data : []).forEach(q => {
+                    const icon = q.status === 'active' ? '✅' : q.status === 'archived' ? '📦' : '📝';
+                    const opt  = document.createElement('option');
+                    opt.value  = q._id;
+                    opt.textContent = `${icon} ${q.title} (${q.category})`;
+                    sel.appendChild(opt);
+                });
+                if (prevVal && prevVal !== 'new') sel.value = prevVal;
+            } catch(e) { console.warn('Could not load quiz list:', e); }
+        };
+
+        // ── Load a quiz for editing ───────────────────────────────────
+        window.loadQuizForEditing = async function(quizId) {
+            if (quizId === 'new') {
+                discardDraft(true); // silent reset
+                return;
+            }
+            try {
+                const [qRes, qsRes] = await Promise.all([
+                    fetch(`${API}/admin/quizzes/${quizId}`),
+                    fetch(`${API}/admin/quizzes/${quizId}/questions`)
+                ]);
+                const quiz      = await qRes.json();
+                const questions = await qsRes.json();
+
+                if (quiz.error) { showBuilderMsg('gs-save-indicator','error','⚠️ Quiz not found.'); return; }
+
+                currentQuizId  = quizId;
+                draftQuestions = questions;
+                populateBuilderForm(quiz);
+                renderQuestionsPanel();
+                loadScheduleState();
+                showBuilderMsg('gs-save-indicator', 'success', `✅ Loaded: "${quiz.title}" (${questions.length} questions)`);
+            } catch(e) {
+                showBuilderMsg('gs-save-indicator', 'error', '❌ Failed to load quiz from backend.');
+            }
+        };
+
+        // ── Save & Deploy ─────────────────────────────────────────────
+        window.saveAndDeployQuiz = async function() {
+            const data = collectBuilderData();
+
+            if (!data.title) {
+                showBuilderMsg('gs-save-indicator', 'error', '⚠️ Quiz Title is required! (General Settings tab)');
+                // switch to general tab
+                document.querySelectorAll('.builder-tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.builder-section').forEach(s => s.classList.remove('active'));
+                document.querySelector('[data-b-tab=general]').classList.add('active');
+                document.getElementById('b-tab-general').classList.add('active');
+                return false;
+            }
+
+            const btn = document.getElementById('save-deploy-btn');
+            btn.textContent = '⏳ Saving...';
+            btn.disabled = true;
+
+            try {
+                let quiz;
+                if (currentQuizId) {
+                    // Update existing quiz
+                    const res = await fetch(`${API}/admin/quizzes/${currentQuizId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    });
+                    quiz = await res.json();
+                } else {
+                    // Create new quiz
+                    const res = await fetch(`${API}/admin/quizzes`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    });
+                    quiz = await res.json();
+                    currentQuizId = quiz._id;
+                }
+
+                if (quiz.error) throw new Error(quiz.error);
+
+                // Save pending draftQuestions that don't yet have a DB id
+                for (const q of draftQuestions) {
+                    if (!q._id) {
+                        const qRes = await fetch(`${API}/admin/quizzes/${currentQuizId}/questions`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(q)
+                        });
+                        const saved = await qRes.json();
+                        q._id = saved._id;
+                    }
+                }
+
+                // Update quiz selector
+                await refreshQuizList();
+                document.getElementById('quiz-selector').value = currentQuizId;
+
+                // Show save indicator
+                const statusEl = document.getElementById('quiz-save-status');
+                statusEl.style.display = 'block';
+                setTimeout(() => statusEl.style.display = 'none', 3000);
+
+                showModal({
+                    icon: '✅',
+                    title: 'Quiz Saved & Deployed!',
+                    msg: `"${quiz.title}" has been ${data.status === 'active' ? 'deployed as ACTIVE — students can now see it in the lobby.' : 'saved as a DRAFT.'}`,
+                    confirmText: 'Awesome'
+                });
+
+                // Sync schedule to localStorage for quiz.html to pick up
+                const schedKey = 'cssc_quiz_schedule';
+                if (data.scheduleStart) {
+                    localStorage.setItem(schedKey, JSON.stringify({ startTime: data.scheduleStart, endTime: data.scheduleEnd }));
+                }
+                loadScheduleState();
+
+            } catch(err) {
+                showModal({ icon: '❌', title: 'Save Failed', msg: `Backend error: ${err.message}`, confirmText: 'OK' });
+                return false;
+            } finally {
+                btn.textContent = '💾 Save & Deploy Quiz';
+                btn.disabled = false;
+            }
+            return true;
+        };
+
+        // ── Discard Draft ──────────────────────────────────────────────
+        window.discardDraft = function(silent = false) {
+            const reset = () => {
+                currentQuizId  = null;
+                draftQuestions = [];
+                editingQIndex  = null;
+
+                // Clear all form fields
+                ['gs-title','gs-category','gs-description','gs-duration','tmr-duration','tmr-per-question',
+                 'beh-max-display','acc-max-attempts','acc-access-code','cert-pass-score',
+                 'quiz-start-time','quiz-end-time'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.value = el.type === 'number' ? (el.defaultValue || '0') : '';
+                });
+                // Reset selects
+                ['gs-difficulty','gs-status','ui-theme','ac-max-warnings'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.selectedIndex = 0;
+                });
+                // Reset checkboxes to defaults
+                ['beh-shuffle-q','beh-shuffle-opts','beh-one-at-a-time','tmr-strict-submit',
+                 'ac-fullscreen','ac-tab-switch','ac-right-click','ac-copy-paste',
+                 'cert-auto-gen','cert-show-analytics','ui-progress-bar','ui-show-numbers'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.checked = true;
+                });
+                document.getElementById('beh-allow-back') && (document.getElementById('beh-allow-back').checked = false);
+
+                document.getElementById('quiz-selector').value = 'new';
+                renderQuestionsPanel();
+            };
+
+            if (silent) { reset(); return; }
+
+            showModal({
+                icon: '🗑️',
+                title: 'Discard Draft?',
+                msg: 'This will clear all unsaved changes and reset the builder to a blank slate. Any already-saved questions will remain in the DB.',
+                confirmText: 'Yes, Discard',
+                cancelText: 'Cancel',
+                onConfirm: reset
+            });
+        };
+
+        // ─────────────────────────────────────────────────────────────
+        // QUESTIONS TAB
+        // ─────────────────────────────────────────────────────────────
+
+        function renderQuestionsPanel() {
+            const container  = document.getElementById('questions-list-container');
+            const emptyState = document.getElementById('empty-q-state');
+            if (!container) return;
+
+            if (!draftQuestions.length) {
+                if (emptyState) emptyState.style.display = 'block';
+                // clear any old rows
+                Array.from(container.children).forEach(c => { if (c !== emptyState) c.remove(); });
+                return;
+            }
+            if (emptyState) emptyState.style.display = 'none';
+
+            // Rebuild list
+            Array.from(container.children).forEach(c => { if (c !== emptyState) c.remove(); });
+
+            draftQuestions.forEach((q, idx) => {
+                const optLetters = ['A','B','C','D'];
+                const correctLabel = q.options && q.options[q.correctAnswerIndex] ? `${optLetters[q.correctAnswerIndex]}) ${q.options[q.correctAnswerIndex]}` : `Option ${q.correctAnswerIndex}`;
+                const diffColor = q.difficulty === 'Hard' ? '#ff4757' : q.difficulty === 'Easy' ? 'var(--neon-green)' : 'var(--neon-blue)';
+
+                const qDiv = document.createElement('div');
+                qDiv.className = 'setting-item';
+                qDiv.style.flexDirection = 'column';
+                qDiv.style.alignItems    = 'flex-start';
+                qDiv.style.gap           = '10px';
+                qDiv.innerHTML = `
+                    <div style="display:flex;justify-content:space-between;width:100%;align-items:flex-start;gap:12px;">
+                        <div style="flex:1;">
+                            <div style="font-family:var(--font-mono);font-size:0.62rem;color:var(--text-muted);letter-spacing:1px;margin-bottom:4px;">Q${idx + 1} · <span style="color:${diffColor};">${q.difficulty || 'Medium'}</span> ${q._id ? '<span style="color:var(--neon-green);">· ✅ SAVED</span>' : '<span style="color:#ff9f43;">· 🕐 PENDING</span>'}</div>
+                            <div style="font-weight:600;color:var(--text-primary);margin-bottom:6px;">${q.questionText || q.text || ''}</div>
+                            <div style="display:flex;flex-wrap:wrap;gap:6px;">
+                                ${(q.options || []).map((o, oi) => `<span style="font-size:0.78rem;padding:2px 8px;border-radius:6px;background:${oi === q.correctAnswerIndex ? 'rgba(0,255,136,0.15)' : 'rgba(255,255,255,0.04)'};border:1px solid ${oi === q.correctAnswerIndex ? 'rgba(0,255,136,0.4)' : 'rgba(255,255,255,0.08)'};color:${oi === q.correctAnswerIndex ? 'var(--neon-green)' : 'var(--text-secondary)'};"><b>${optLetters[oi]}</b>) ${o}</span>`).join('')}
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:8px;flex-shrink:0;">
+                            <button class="table-action-btn edit" onclick="openEditQuestion(${idx})">✏️ Edit</button>
+                            <button class="table-action-btn danger" onclick="deleteQuestion(${idx})">🗑️ Del</button>
+                        </div>
+                    </div>`;
+                container.appendChild(qDiv);
+            });
+        }
+
+        // Open question modal for ADD or EDIT
+        window.openEditQuestion = function(idx) {
+            editingQIndex = idx;
+            const q = draftQuestions[idx];
+            document.getElementById('q-prompt').value  = q.questionText || q.text || '';
+            document.getElementById('q-opt-0').value   = (q.options || [])[0] || '';
+            document.getElementById('q-opt-1').value   = (q.options || [])[1] || '';
+            document.getElementById('q-opt-2').value   = (q.options || [])[2] || '';
+            document.getElementById('q-opt-3').value   = (q.options || [])[3] || '';
+            document.getElementById('q-correct').value = String(q.correctAnswerIndex ?? 0);
+            document.getElementById('q-diff').value    = q.difficulty || 'Medium';
+            document.getElementById('q-modal').classList.add('show');
+        };
+
+        // Delete question
+        window.deleteQuestion = async function(idx) {
+            const q = draftQuestions[idx];
+            const doDelete = async () => {
+                if (q._id && currentQuizId) {
+                    try {
+                        await fetch(`${API}/admin/quizzes/${currentQuizId}/questions/${q._id}`, { method: 'DELETE' });
+                    } catch(e) { console.warn('Delete from DB failed:', e); }
+                }
+                draftQuestions.splice(idx, 1);
+                renderQuestionsPanel();
+            };
+            showModal({
+                icon: '🗑️',
+                title: 'Delete Question?',
+                msg: `Remove Q${idx + 1}: "${(q.questionText || q.text || '').substring(0, 60)}..."?`,
+                confirmText: 'Yes, Delete',
+                cancelText: 'Cancel',
+                onConfirm: doDelete
+            });
+        };
+
+        // Open fresh question modal
+        const origQModal = document.querySelector('[onclick*="q-modal"].btn-sm');
+        if (origQModal) {
+            origQModal.onclick = () => {
+                editingQIndex = null;
+                document.getElementById('q-prompt').value  = '';
+                document.getElementById('q-opt-0').value   = '';
+                document.getElementById('q-opt-1').value   = '';
+                document.getElementById('q-opt-2').value   = '';
+                document.getElementById('q-opt-3').value   = '';
+                document.getElementById('q-correct').value = '0';
+                document.getElementById('q-diff').value    = 'Medium';
+                document.getElementById('q-modal').classList.add('show');
+            };
+        }
+
+        // Expose to window for inline onclick
         window.handleFileSelect = function(e) {
             if(e.target.files.length > 0) processFile(e.target.files[0]);
         };
@@ -1787,7 +2196,7 @@
                 statusEl.style.display = 'block';
 
                 try {
-                    const res = await fetch('http://localhost:5003/api/admin/quizzes/bulk', {
+                    const res = await fetch(`${API}/admin/quizzes/bulk`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ rounds: parsedRoundsData })
@@ -1796,7 +2205,8 @@
                     if (res.ok) {
                         showModal('✅', 'Deployment Complete', 'Rounds successfully pushed to Virtual DB!', 'Awesome');
                         statusEl.innerText = "Deployed successfully!";
-                        setTimeout(loadOverview, 1000); // refresh dashboard
+                        await refreshQuizList();
+                        setTimeout(loadOverview, 1000);
                     } else {
                         throw new Error("Failed to deploy API");
                     }
@@ -1902,7 +2312,107 @@
             });
         }
 
+        window.deployRoundsToQuiz = function() {
+            if (!parsedRoundsData || Object.keys(parsedRoundsData).length === 0) return;
+            
+            let addedCount = 0;
+            // Iterate over all keys (sheets/rounds)
+            for (const roundName of Object.keys(parsedRoundsData)) {
+                const questions = parsedRoundsData[roundName];
+                questions.forEach(q => {
+                    let ansIdx = 0;
+                    if (q.answer) {
+                        const ansLower = String(q.answer).toLowerCase().trim();
+                        // if answer is A, B, C, D
+                        if (['a','b','c','d'].includes(ansLower)) {
+                            ansIdx = ansLower.charCodeAt(0) - 97; // a=0, b=1, c=2, d=3
+                        } 
+                        // if answer is exact text of option
+                        else {
+                            const exactMatch = q.options.findIndex(o => String(o).toLowerCase().trim() === ansLower);
+                            if (exactMatch !== -1) ansIdx = exactMatch;
+                        }
+                    }
+
+                    draftQuestions.push({
+                        questionText: q.question,
+                        options: q.options,
+                        correctAnswerIndex: ansIdx,
+                        difficulty: 'Medium'
+                    });
+                    addedCount++;
+                });
+            }
+            
+            showModal({ icon: '✅', title: 'Successfully Deployed', msg: `Added ${addedCount} questions. Click "Save & Deploy Quiz" to finalize your draft to the active database.`, confirmText: 'Awesome!' });
+            
+            // hide preview area
+            document.getElementById('csv-upload-zone').style.display = 'block';
+            document.getElementById('round-tabs-bar').style.display = 'none';
+            document.getElementById('parsed-preview-area').style.display = 'none';
+
+            // clear parse cache
+            parsedRoundsData = {};
+
+            // render the questions list
+            renderQuestionsPanel();
+        };
+
+        // ─── saveNewQuestion ─────────────────────────────────────────
+        // Called by the Question Editor modal "Save to Draft" button
+        window.saveNewQuestion = async function() {
+            const questionText = document.getElementById('q-prompt').value.trim();
+            if (!questionText) {
+                alert('Please enter a question prompt!');
+                return;
+            }
+
+            const options = [
+                document.getElementById('q-opt-0').value.trim(),
+                document.getElementById('q-opt-1').value.trim(),
+                document.getElementById('q-opt-2').value.trim(),
+                document.getElementById('q-opt-3').value.trim(),
+            ].filter(o => o);
+
+            if (options.length < 2) {
+                alert('Please provide at least 2 options (A & B)!');
+                return;
+            }
+
+            const correctAnswerIndex = parseInt(document.getElementById('q-correct').value || '0');
+            const difficulty         = document.getElementById('q-diff').value || 'Medium';
+
+            const qData = { questionText, options, correctAnswerIndex, difficulty };
+
+            if (editingQIndex !== null) {
+                // Editing existing question
+                const existing = draftQuestions[editingQIndex];
+                Object.assign(existing, qData);
+
+                // If already saved to DB, update it
+                if (existing._id && currentQuizId) {
+                    try {
+                        await fetch(`${API}/admin/quizzes/${currentQuizId}/questions/${existing._id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(qData)
+                        });
+                    } catch(e) { console.warn('Update question DB failed:', e); }
+                }
+                editingQIndex = null;
+            } else {
+                // Adding new question to draft
+                draftQuestions.push(qData);
+            }
+
+            document.getElementById('q-modal').classList.remove('show');
+            renderQuestionsPanel();
+        };
+
+        let parsedRoundsData = {};
+
     })();
+
     </script>
 
     <!-- ===== FIREBASE ADMIN LISTENER (ES Module) ===== -->

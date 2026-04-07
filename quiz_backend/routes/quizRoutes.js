@@ -5,10 +5,12 @@ const Question = require('../models/Question');
 const Result = require('../models/Result');
 const User = require('../models/User');
 
-// Get all active quizzes (for lobby)
+// Get all active quizzes (for lobby) — includes schedule for frontend enforcement
 router.get('/quizzes', async (req, res) => {
   try {
-    const quizzes = await Quiz.find({ status: 'active' }).select('title description category durationMinutes settings');
+    const quizzes = await Quiz.find({ status: 'active' })
+      .sort({ createdAt: -1 })
+      .select('title description category durationMinutes settings scheduleStart scheduleEnd maxAttempts accessCode');
     res.json(quizzes);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -18,6 +20,27 @@ router.get('/quizzes', async (req, res) => {
 // Get questions for a specific quiz (student initiating quiz)
 router.get('/:quizId/questions', async (req, res) => {
   try {
+    const quiz = await Quiz.findById(req.params.quizId);
+    if (!quiz) return res.status(404).json({ error: 'Quiz not found.' });
+
+    // ── Schedule enforcement (backend gate) ─────────────────────────
+    const now = new Date();
+    if (quiz.scheduleStart && now < new Date(quiz.scheduleStart)) {
+      return res.status(403).json({
+        error: 'SCHEDULE_NOT_STARTED',
+        message: 'This quiz has not started yet.',
+        opensAt: quiz.scheduleStart
+      });
+    }
+    if (quiz.scheduleEnd && now > new Date(quiz.scheduleEnd)) {
+      return res.status(403).json({
+        error: 'SCHEDULE_CLOSED',
+        message: 'The quiz window for this assessment has closed.',
+        closedAt: quiz.scheduleEnd
+      });
+    }
+    // ────────────────────────────────────────────────────────────────
+
     // SECURITY: -correctAnswerIndex ensures answers are NEVER sent to the browser
     const questions = await Question.find({ quizId: req.params.quizId }).select('-correctAnswerIndex -createdAt -updatedAt');
     res.json(questions);

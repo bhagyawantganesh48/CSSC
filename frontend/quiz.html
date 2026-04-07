@@ -604,7 +604,8 @@
     // Fetches the schedule from the backend. Falls back to localStorage.
     (function enforceQuizSchedule() {
         const SCHED_KEY  = 'cssc_quiz_schedule';
-        const API        = 'http://localhost:5003/api';
+        const isLocal    = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const API        = isLocal ? 'http://localhost:5003/api' : '/api';
         const lockout    = document.getElementById('quiz-schedule-lockout');
         const pad2       = n => String(n).padStart(2, '0');
         let countdownTimer = null;

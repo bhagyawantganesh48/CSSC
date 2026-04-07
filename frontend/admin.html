@@ -1802,7 +1802,8 @@
         }
 
         // ─── Quiz Builder Engine ───────────────────────────────────────────
-        const API = 'http://localhost:5003/api';
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const API = isLocal ? 'http://localhost:5003/api' : '/api';
         let currentQuizId = null;   // null = creating new
         let draftQuestions = [];    // questions staged for current draft
         let editingQIndex  = null;  // index in draftQuestions being edited
